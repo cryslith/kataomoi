@@ -15,5 +15,10 @@ server pending = do
   let jsonString = T.unpack text
   let result = J.decode jsonString
   case result of
-    Error e => print e
-    Ok jsonData => 
+    J.Error e -> print e
+    J.Ok jsonData -> do
+                   let dict = J.fromJSObject jsonData
+                   print [(k, T.unpack v) | (k,v) <- dict]
+
+main :: IO ()
+main = WS.runServer "18.243.0.45" 8000 server
