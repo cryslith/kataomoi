@@ -46,4 +46,4 @@ server mstate pending = do
 main :: IO ()
 main = do
   mstate <- newMVar newServerState
-  WS.runServer "0.0.0.0" 8989 $ server mstate
+  WS.runServer "0.0.0.0" 8000 $ server mstate
