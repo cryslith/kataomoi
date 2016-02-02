@@ -29,7 +29,7 @@ server mstate pending = do
         y = do
           jsonData <- case J.decode jsonString of
                         J.Error e -> Nothing
-                        J.Ok jsonData -> Just jsonData
+                        J.Ok jsonData -> Just $ Map.fromList $ J.fromJSObject jsonData
           t <- Map.lookup "type" jsonData
           if t == "users" then
               Just $ do
