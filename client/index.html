@@ -1,0 +1,31 @@
+<html>
+    <head>
+        <title>kataomoi</title>
+    </head>
+    <body>
+        <form name="signin" onsubmit="signIn(); return false">
+            <input type="text" name="name"/>
+            <input type="submit" value="Sign In"/>
+        </form>
+        <h2>Welcome, <span id="name"></span>!</h2>
+        <h2>Users Online:</h2>
+        <div id="users"></div>
+        <script type="text/javascript">
+         var socket = new WebSocket("ws://127.0.0.1:8000"); // for testing
+
+         socket.onmessage = function (event) {
+             console.log(event.data);
+             var users = JSON.parse(event.data);
+             var userList = "<ul>" + users.map(function (user) { return "<li>" + user + "</li>" }).join("") + "</ul>";
+
+             document.getElementById("users").innerHTML = userList; // XXX this is totally insecure, we need to sanitize everything
+         }
+
+         function signIn() {
+             var name = document.forms["signin"]["name"].value;
+             document.getElementById("name").innerHTML = name;
+             socket.send(JSON.stringify({"type": "hello", "name": name}));
+         }
+        </script>
+    </body>
+</html>
