@@ -81,10 +81,11 @@ Initiates a SENPAI exchange with another client.
 
 Fields:
 
-* x3: The "dummy" bit; padded, concatenated with a verification
-  string, encrypted with the user's RSA key, and encoded as a string
-  of base 64 digits.
-* y3: The "response" bit; padded, encrypted, and base 64 encoded
+* x3: The "dummy" bit; concatenated with a verification string, padded,
+  encrypted with the user's RSA key, and encoded as a string of base 64
+  digits.
+* y3: The "response" bit; concatenated with a verification string,
+  padded, encrypted, and base 64 encoded
 * s3: The verification string; padded, encrypted, and base 64 encoded
 
 ### respond
