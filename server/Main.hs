@@ -34,6 +34,14 @@ sendUsers conn s = WS.sendTextData conn $ T.pack $ J.encode $
 sendAllUsers :: ServerState -> IO ()
 sendAllUsers s = Map.fold (\conn m -> (m >> (sendUsers conn s))) (return ()) s
 
+forwardMessage :: ServerState -> User -> String -> IO Bool
+forwardMessage s user t =
+  case Map.lookup user s of
+    Just conn -> do
+                   WS.sendTextData conn $ T.pack $ t
+                   return True
+    Nothing -> return False
+
 sendError :: WS.Connection -> String -> String -> IO ()
 sendError conn s m = WS.sendTextData conn $ T.pack $ J.encode $
                      J.toJSObject [("type", J.showJSON "error"),
@@ -66,6 +74,15 @@ server mstate pending = do
                                   writeIORef nameRef $ Just name
                                   sendAllUsers s'
                                   return s'
+          else if elem t clientMessages then
+            do
+              sender <- Map.lookup "sender" jsonData
+              receiver <- Map.lookup "receiver" jsonData
+              payload <- Map.lookup "payload" jsonData
+              Just $ do
+                s <- readMVar mstate
+                x <- forwardMessage s receiver jsonString
+                if x then return () else sendError conn "no such reciever" jsonString
           else if t == "quit" then Just $ do
             name <- readIORef nameRef
             case name of
@@ -75,7 +92,9 @@ server mstate pending = do
             WS.sendClose conn (T.pack "client requested quit")
           else Nothing
     case y of
-      Nothing -> putStrLn $ "undecodable string: " ++ jsonString
+      Nothing -> do
+                   putStrLn $ "bad message: " ++ jsonString
+                   sendError conn "bad message" jsonString
       Just x -> x
 
 main :: IO ()
