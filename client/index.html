@@ -15,16 +15,22 @@
 
          socket.onmessage = function (event) {
              console.log(event.data);
-             var users = JSON.parse(event.data);
-             var userList = "<ul>" + users.map(function (user) { return "<li>" + user + "</li>" }).join("") + "</ul>";
-
-             document.getElementById("users").innerHTML = userList; // XXX this is totally insecure, we need to sanitize everything
+             var data = JSON.parse(event.data);
+             switch (data["type"]) {
+             case "users":
+                 var users = data["users"]
+                 var userList = "<ul>" + users.map(function (user) { return "<li>" + user + "</li>" }).join("") + "</ul>";
+                 document.getElementById("users").innerHTML = userList; // XXX this is totally insecure, we need to sanitize everything
+                 break;
+             default:
+                 console.log("invalid message type")
+             }
          }
 
          function signIn() {
              var name = document.forms["signin"]["name"].value;
              document.getElementById("name").innerHTML = name;
-             socket.send(JSON.stringify({"type": "hello", "name": name}));
+             socket.send(JSON.stringify({"type": "join", "name": name}));
          }
         </script>
     </body>
