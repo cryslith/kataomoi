@@ -77,12 +77,12 @@ server mstate pending = do
           else if elem t clientMessages then
             do
               sender <- Map.lookup "sender" jsonData
-              receiver <- Map.lookup "receiver" jsonData
+              recipient <- Map.lookup "recipient" jsonData
               payload <- Map.lookup "payload" jsonData
               Just $ do
                 s <- readMVar mstate
-                x <- forwardMessage s receiver jsonString
-                if x then return () else sendError conn "no such reciever" jsonString
+                x <- forwardMessage s recipient jsonString
+                if x then return () else sendError conn "no such recipient" jsonString
           else if t == "quit" then Just $ do
             name <- readIORef nameRef
             case name of
