@@ -20,6 +20,12 @@ newServerState = Map.empty
 userList :: ServerState -> [User]
 userList = Map.keys
 
+changeState ::  MVar ServerState -> (ServerState -> IO ServerState)-> IO ()
+changeState mstate f = do
+  modifyMVar_ mstate f
+  state' <- readMVar mstate
+  sendAllUsers state'
+
 addUser :: User -> UserData -> ServerState -> Maybe ServerState
 addUser u c s = if Map.member u s then Nothing else Just $ Map.insert u c s
 
@@ -54,8 +60,9 @@ server :: MVar ServerState -> WS.ServerApp
 server mstate pending = do
   conn <- WS.acceptRequest pending
   nameRef <- newIORef Nothing
-  forever $ do
+  flip C.finally (disconnect conn nameRef) $ forever $ do
     text <- WS.receiveData conn
+    putStrLn (T.unpack text)
     let jsonString = T.unpack text
         y = do
           jsonData <- case J.decode jsonString of
@@ -65,15 +72,17 @@ server mstate pending = do
           if t == "join" then
             do
               name <- Map.lookup "name" jsonData
-              Just $ modifyMVar_ mstate $ \s ->
+              Just $ changeState mstate $ \s ->
                    case addUser name conn s of
                      Nothing -> do
                                   sendError conn "user already exists" jsonString
                                   return s
                      Just s' -> do
+                                  n <- readIORef nameRef
                                   writeIORef nameRef $ Just name
-                                  sendAllUsers s'
-                                  return s'
+                                  return $ case n of
+                                             Nothing -> s'
+                                             Just n' -> removeUser n' s'
           else if elem t clientMessages then
             do
               sender <- Map.lookup "sender" jsonData
@@ -83,19 +92,21 @@ server mstate pending = do
                 s <- readMVar mstate
                 x <- forwardMessage s recipient jsonString
                 if x then return () else sendError conn "no such recipient" jsonString
-          else if t == "quit" then Just $ do
-            name <- readIORef nameRef
-            case name of
-              Nothing -> return ()
-              Just name' -> modifyMVar_ mstate $ \s ->
-                              return (removeUser name' s)
-            WS.sendClose conn (T.pack "client requested quit")
+          else if t == "quit" then Just $ disconnect conn nameRef
           else Nothing
     case y of
       Nothing -> do
                    putStrLn $ "bad message: " ++ jsonString
                    sendError conn "bad message" jsonString
       Just x -> x
+  where
+    disconnect conn nameRef = do
+      WS.sendClose conn (T.pack "quit")
+      name <- readIORef nameRef
+      case name of
+        Nothing -> return ()
+        Just name' -> changeState mstate $ \s -> return $ removeUser name' s
+
 
 main :: IO ()
 main = do
