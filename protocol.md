@@ -67,13 +67,13 @@ Fields:
 
 ## Client-to-client message types
 
-All client-to-client messages have "sender" and "recipient" fields
-holding the usernames of the sender and desired recipient; these
-messages are sent by the client to the server and passed on
-accordingly. The only other field is a "payload" field; this consists
-of a JSON object containing the remaining fields of the message,
-encrypted and signed using the recipient and sender's RSA keys, and
-encoded as a string of base 64 digits.
+All client-to-client messages have type "client", and have "sender" and
+"recipient" fields holding the usernames of the sender and desired
+recipient; these messages are sent by the client to the server and
+passed on accordingly. The only other field is a "payload" field; this
+consists of a JSON object containing the remaining fields of the
+message, encrypted and signed using the recipient and sender's RSA keys,
+and encoded as a string of base 64 digits.
 
 ### initiate
 

@@ -54,7 +54,7 @@ sendError conn s m = WS.sendTextData conn $ T.pack $ J.encode $
                                    ("error", J.showJSON s),
                                    ("message", J.showJSON m)]
 
-clientMessages = ["initiate", "respond", "decrypt", "reveal", "confirm"]
+-- clientMessages = ["initiate", "respond", "decrypt", "reveal", "confirm"]
 
 server :: MVar ServerState -> WS.ServerApp
 server mstate pending = do
@@ -83,7 +83,7 @@ server mstate pending = do
                                   return $ case n of
                                              Nothing -> s'
                                              Just n' -> removeUser n' s'
-          else if elem t clientMessages then
+          else if t == "client" then
             do
               sender <- Map.lookup "sender" jsonData
               recipient <- Map.lookup "recipient" jsonData
