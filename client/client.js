@@ -40,12 +40,19 @@ function receiveServer(data) {
 
 function signIn() {
     name = document.forms["signin"]["name"].value;
+    if (!usernameOK(name)) {
+        document.getElementById("name").innerHTML =
+            "<span style=\"color:red;\">" +
+            "name must match ^[a-zA-Z0-9]{1,8}$" +
+            "</span>";
+        return;
+    }
     document.getElementById("name").innerHTML = name;
     sendServer({"type": "join", "name": name});
 }
 
 function usernameOK(username) {
-    return /^[a-zA-Z0-9]+$/.test(username);
+    return /^[a-zA-Z0-9]{1,8}$/.test(username);
 }
 
 function userList(users) {
