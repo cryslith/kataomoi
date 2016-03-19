@@ -36,7 +36,7 @@ server. Its fields are:
   of nonzero length, containing only alphanumeric characters, spaces,
   hyphens, and underscores.
 * pubkey: an RSA modulus, encoded as a string of base 64 digits. This
-  will be the user's public key in all later protocol exchanges.
+  will be the user's public key for wrapping all messages
 
 ### quit
 
@@ -73,32 +73,36 @@ recipient; these messages are sent by the client to the server and
 passed on accordingly. The only other field is a "payload" field; this
 consists of a JSON object containing the remaining fields of the
 message, encrypted and signed using the recipient and sender's RSA keys,
-and encoded as a string of base 64 digits.
+and encoded as a string of base 64 digits.  In these calculations, e = 3
+is the public exponent, and all calculations on encrypted values are
+performed mod N, where N is the modulus of the initiator's SENPAI public
+key.  All numerical values are base64 encoded.
 
 ### initiate
 
-Initiates a SENPAI exchange with another client.
+Initiates a SENPAI exchange with another client.  Requires randomly
+generating a new SENPAI public key.
 
 Fields:
 
-* x3: The "dummy" bit; concatenated with a verification string, padded,
-  encrypted with the user's RSA key, and encoded as a string of base 64
-  digits.
-* y3: The "response" bit; concatenated with a verification string,
-  padded, encrypted, and base 64 encoded
-* s3: The verification string; padded, encrypted, and base 64 encoded
+* n: the sender's SENPAI public key modulus N.
+* xe: The "dummy" bit; concatenated with a verification string, padded
+  and encrypted with the sender's SENPAI public key.
+* ye: The "response" bit; concatenated with a verification string if 1,
+  padded and encrypted with the sender's SENPAI public key.
+* sh: The verification string, SHA-256 hashed
 
 ### respond
 
 Sent in response to an "initiate" message
 
-* wr3: Whichever of x3 or y3 the client chose, multiplied by r^3 and base64 encoded
+* wre: Whichever of xe or ye the client chose, multiplied by r^e
 
 ### decrypt
 
 Sent in response to a "respond" message
 
-* wr: wr3 decrypted, base64 encoded
+* wr: wre, decrypted
 
 ### reveal
 
