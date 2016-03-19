@@ -1,14 +1,16 @@
 <html>
     <head>
         <title>kataomoi</title>
+        <script type="text/javascript" src="forge.min.js"></script>
         <script type="text/javascript" src="client.js"></script>
     </head>
     <body>
-        <form name="signin" onsubmit="signIn(); return false">
+        <form name="signin" onsubmit="signIn()"
+              action="javascript:void(0);">
             <input type="text" name="name"/>
             <input type="submit" value="Sign In"/>
         </form>
-        <h2>Welcome, <span id="name"></span>!</h2>
+        <h2 id="name"></h2>
         <h2>Users Online:</h2>
         <div id="users"></div>
     </body>
