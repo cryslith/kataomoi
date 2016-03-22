@@ -231,14 +231,18 @@ function reveal(username) {
     }
     like = getFirstBit(w_bytes) == 1;
     data["likemutual"] = like ? likes.LIKE : likes.DONTLIKE;
-    var s = undefined;
-    if (!like) {
-        s = w_bytes.slice(X_LEN); // TODO check s against sh
+
+    if (like) {
+        sendClient(username, {"type": "reveal",
+                              "result": "true"});
+    }
+    else {
+        var s = w_bytes.slice(X_LEN); // TODO check s against sh
+        sendClient(username, {"type": "reveal",
+                              "result": "false",
+                              "s": e64(s)});
     }
 
-    sendClient(username, {"type": "reveal",
-                          "result": like ? "true" : "false",
-                          "s": e64(s)});
 
     data["state"] = states.REVEALED;
 }
@@ -332,7 +336,9 @@ function receiveClient(sender, message) {
         }
         data["likemutual"] = message["result"] == "true"
             ? likes.LIKE : likes.DONTLIKE;
-        data["so"] = d64(message["s"]);
+        if ("s" in message) {
+            data["so"] = d64(message["s"]);
+        }
         confirm(sender);
         displayResult(sender);
         return;
