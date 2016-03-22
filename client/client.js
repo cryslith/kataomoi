@@ -237,8 +237,8 @@ function reveal(username) {
     }
 
     sendClient(username, {"type": "reveal",
-                          "result": like ? "true" : false,
-                          "s": s});
+                          "result": like ? "true" : "false",
+                          "s": e64(s)});
 
     data["state"] = states.REVEALED;
 }
@@ -332,7 +332,7 @@ function receiveClient(sender, message) {
         }
         data["likemutual"] = message["result"] == "true"
             ? likes.LIKE : likes.DONTLIKE;
-        data["so"] = message["s"];
+        data["so"] = d64(message["s"]);
         confirm(sender);
         displayResult(sender);
         return;
