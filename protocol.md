@@ -67,16 +67,24 @@ Fields:
 
 ## Client-to-client message types
 
-All client-to-client messages have type "client", and have "sender" and
-"recipient" fields holding the usernames of the sender and desired
-recipient; these messages are sent by the client to the server and
-passed on accordingly. The only other field is a "payload" field; this
-consists of a JSON object containing the remaining fields of the
-message, encrypted and signed using the recipient and sender's RSA keys,
-and encoded as a string of base 64 digits.  In these calculations, e = 3
-is the public exponent, and all calculations on encrypted values are
-performed mod N, where N is the modulus of the initiator's SENPAI public
-key.  All numerical values are base64 encoded.
+All client-to-client messages have type "client".
+
+Fields:
+
+* sender: the sender of the message
+* recipient: the desired recipient of the message
+* key: An AES-256 key encrypted with the recipient's RSA key (using
+  RSAES PKCS#1 v1.5) and base-64 encoded
+* iv: An initialization vector for the encryption, base-64 encoded
+* payload: The remaining fields of the message, encrypted using the AES
+  key and IV and base-64 encoded
+* signature: The SHA256 hash of the encrypted payload signed with the
+  sender's RSA key (using RSASSA PKCS#1 v1.5) and base-64 encoded
+
+In the following calculations, e = 0x10001 is the public exponent, and
+all calculations on encrypted values are performed mod N, where N is the
+modulus of the initiator's SENPAI public key.  All numerical values are
+base64 encoded.
 
 ### initiate
 

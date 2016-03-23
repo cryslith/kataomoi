@@ -8,15 +8,16 @@ var e64 = forge.util.encode64;
 var d64 = forge.util.decode64;
 var NBITS = 1024;
 var PUBLIC_EXPONENT = 0x10001;
+var eBI = new forge.jsbn.BigInteger("" + PUBLIC_EXPONENT, 10);
 var SENPAI_PUBLIC_EXPONENT = 0x10001;
-var eBI = new forge.jsbn.BigInteger("" + SENPAI_PUBLIC_EXPONENT, 10);
+var seBI = new forge.jsbn.BigInteger("" + SENPAI_PUBLIC_EXPONENT, 10);
 var X_LEN = 32; // bytes
 var S_LEN = 32; // bytes
 
 var socket = new WebSocket("ws://127.0.0.1:8000"); // for testing
 var users = new Map();
 var name = undefined;
-//var keypair = rsa.generateKeyPair({bits: NBITS, e: PUBLIC_EXPONENT});
+var keypair = rsa.generateKeyPair({bits: NBITS, e: PUBLIC_EXPONENT});
 
 
 socket.onmessage = receiveServer_raw;
@@ -38,9 +39,7 @@ function receiveServer(data) {
             console.log("spurious message");
             return;
         }
-        console.log(data["payload"]);
-        receiveClient(data["sender"],
-                      decodePayload(data["sender"], data["payload"]));
+        receiveClient(data["sender"], decodePayload(data));
         break;
     case "error":
         console.log("server error: " + data["error"]);
@@ -60,7 +59,13 @@ function signIn() {
             "</span>";
     }
     document.getElementById("name").innerHTML = "Welcome, " + name + "!";
-    sendServer({"type": "join", "name": name});
+
+    join();
+}
+
+function join() {
+    sendServer({"type": "join", "name": name,
+                "pubkey": e64(bigNumToBytes(keypair.publicKey.n))});
 }
 
 function usernameOK(username) {
@@ -89,20 +94,24 @@ function userList(users) {
 }
 
 function updateUsers(users, newUsernames) {
-    newUsernames.forEach(function(username) {
+    for (var username in newUsernames) {
         if (usernameOK(username)) {
             if (!users.has(username)) {
-                users.set(username, {"state": states.INITIAL,
-                                     "like": likes.UNKNOWN,
-                                     "likesus": likes.UNKNOWN});
+                users.set(username,
+                          {"pubkey":
+                           bytesToBigNum(d64(newUsernames[username])),
+                           "state": states.INITIAL,
+                           "like": likes.UNKNOWN,
+                           "likesus": likes.UNKNOWN});
             }
         }
         else {
             console.log("illegal username: " + username);
         }
-    });
+    }
+
     [...users].forEach(function([username, data]) {
-        if (newUsernames.indexOf(username) == -1) {
+        if (!(username in newUsernames)) {
             users.delete(username);
         }
     });
@@ -139,15 +148,13 @@ function sendSelection(username) {
 }
 
 function withFirstBit(bytes, b) {
-    var buffer = new forge.util.createBuffer();
-    buffer.putBytes(bytes);
+    var buffer = forge.util.createBuffer(bytes, "raw");
     buffer.setAt(0, buffer.at(0) & 0xfe | b);
     return buffer.bytes();
 }
 
 function getFirstBit(bytes) {
-    var buffer = new forge.util.createBuffer();
-    buffer.putBytes(bytes);
+    var buffer = forge.util.createBuffer(bytes, "raw");
     return buffer.at(0) & 0x01;
 }
 
@@ -188,12 +195,12 @@ function initiate(username) {
 }
 
 function respond(username) {
-    data = users.get(username);
+    var data = users.get(username);
     var n = data["n"];
     var nbytes = Math.ceil(n.bitLength() / 8)
     var r = bytesToBigNum(forge.random.getBytesSync(nbytes));
     data["r"] = r;
-    var re = r.modPow(eBI, n);
+    var re = r.modPow(seBI, n);
     var we = data["like"] == likes.LIKE ? data["ye"] : data["xe"];
     var wre = re.multiply(we).mod(n);
 
@@ -204,7 +211,7 @@ function respond(username) {
 }
 
 function decrypt(username) {
-    data = users.get(username);
+    var data = users.get(username);
     var wre = data["wre"];
     var key = data["keypair"];
     var k = Math.ceil(key.publicKey.n.bitLength() / 8);
@@ -219,17 +226,17 @@ function decrypt(username) {
 
 
 function reveal(username) {
-    data = users.get(username);
+    var data = users.get(username);
     var wr = data["wr"];
     var rInv = data["r"].modInverse(data["n"]);
     var w = wr.multiply(rInv).mod(data["n"]);
-    w_bytes = bigNumToBytes(w);
-    w_bytes = zero_pad(w_bytes, X_LEN + S_LEN);
+    var w_bytes = bigNumToBytes(w);
+    var w_bytes = zero_pad(w_bytes, X_LEN + S_LEN);
     if (w_bytes.length != X_LEN + S_LEN) {
         console.log("bad w_bytes length " + w_bytes.length);
         return;
     }
-    like = getFirstBit(w_bytes) == 1;
+    var like = getFirstBit(w_bytes) == 1;
     data["likemutual"] = like ? likes.LIKE : likes.DONTLIKE;
 
     if (like) {
@@ -248,7 +255,7 @@ function reveal(username) {
 }
 
 function confirm(username) {
-    data = users.get(username);
+    var data = users.get(username);
     if (data["likemutual"] == likes.DONTLIKE) {
         if (data["so"] != data["s"]) {
             console.log("detected cheating via s");
@@ -264,10 +271,9 @@ function confirm(username) {
 }
 
 function verify(username) {
-    data = users.get(username);
+    var data = users.get(username);
     var x = data["x"]; // TODO check s from x against sh
-    var pubkey = rsa.setPublicKey(
-        data["n"], eBI);
+    var pubkey = rsa.setPublicKey(data["n"], seBI);
     var xe = pubkey.encrypt(x, "RAW");
 
     if (data["xe"].toString() != bytesToBigNum(xe).toString()) {
@@ -286,12 +292,15 @@ function sendServer(x) {
 }
 
 function sendClient(recipient, message) {
-    sendServer({"type": "client", "sender": name, "recipient": recipient,
-                "payload": encodePayload(recipient, message)});
+    var encoded = encodePayload(recipient, message);
+    encoded["type"] = "client";
+    encoded["sender"] = name;
+    encoded["recipient"] = recipient;
+    sendServer(encoded);
 }
 
 function receiveClient(sender, message) {
-    data = users.get(sender);
+    var data = users.get(sender);
     switch (message["type"]) {
     case "initiate":
         switch (data["state"]) {
@@ -382,7 +391,7 @@ function bigNumToBytes(y) {
 }
 
 function displayResult(username) {
-    data = users.get(username);
+    var data = users.get(username);
     if (data["state"] == states.CONFIRMED) {
         result = data["likemutual"] == likes.LIKE;
         document.getElementById("result_" + username).innerHTML = result ?
@@ -394,12 +403,56 @@ function displayResult(username) {
     }
 }
 
-// TODO encryption
 function encodePayload(recipient, message) {
-    return JSON.stringify(message);
+    var plaintext = JSON.stringify(message);
+    var n = users.get(recipient)["pubkey"];
+    var pubkey = rsa.setPublicKey(n, eBI);
+
+    var aeskey = forge.random.getBytesSync(32); // AES-256
+    var iv = forge.random.getBytesSync(16);
+
+    var encryptedkey = pubkey.encrypt(aeskey);
+
+    var cipher = forge.cipher.createCipher("AES-CBC", aeskey);
+    cipher.start({"iv": iv});
+    cipher.update(forge.util.createBuffer(plaintext));
+    cipher.finish();
+    var ciphertext = cipher.output.bytes();
+
+    var digest = forge.md.sha256.create();
+    digest.update(ciphertext);
+    var signature = keypair.privateKey.sign(digest);
+
+    return {"key": e64(encryptedkey),
+            "iv": e64(iv),
+            "payload": e64(ciphertext),
+            "signature": e64(signature)};
 }
 
-// TODO encryption
-function decodePayload(sender, payload) {
-    return JSON.parse(payload);
+function decodePayload(data) {
+    var sender = data["sender"];
+    var encryptedkey = d64(data["key"]);
+    var iv = d64(data["iv"]);
+    var payload = d64(data["payload"]);
+    var signature = d64(data["signature"]);
+
+    var n = users.get(sender)["pubkey"];
+    var pubkey = rsa.setPublicKey(n, eBI);
+
+    var digest = forge.md.sha256.create();
+    digest.update(payload);
+    var verified = pubkey.verify(digest.digest().bytes(), signature);
+    if (!verified) {
+        throw "Invalid signature";
+    }
+
+    var aeskey = keypair.privateKey.decrypt(encryptedkey);
+    var decipher = forge.cipher.createDecipher("AES-CBC", aeskey);
+    decipher.start({"iv": iv});
+    decipher.update(forge.util.createBuffer(payload, "raw"));
+    decipher.finish();
+
+    var plaintext = decipher.output.bytes();
+    console.log(plaintext);
+    return JSON.parse(plaintext);
 }

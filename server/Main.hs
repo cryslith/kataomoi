@@ -8,7 +8,14 @@ import Control.Concurrent (MVar, newMVar, modifyMVar_, modifyMVar, readMVar)
 import Data.IORef
 
 type User = String
-type UserData = WS.Connection
+type PublicKey = String
+type UserData = (WS.Connection, PublicKey)
+
+getConn :: UserData -> WS.Connection
+getConn = fst
+
+getKey :: UserData -> PublicKey
+getKey = snd
 
 type ServerState = Map.Map User UserData
 
@@ -17,8 +24,8 @@ port = 8000
 newServerState :: ServerState
 newServerState = Map.empty
 
-userList :: ServerState -> [User]
-userList = Map.keys
+userList :: ServerState -> [(User, PublicKey)]
+userList = Map.toList . Map.map (\(_, key) -> key)
 
 changeState ::  MVar ServerState -> (ServerState -> IO ServerState)-> IO ()
 changeState mstate f = do
@@ -37,18 +44,21 @@ send conn = WS.sendTextData conn . T.pack . J.encode
 
 sendUsers :: WS.Connection -> ServerState -> IO ()
 sendUsers conn s = send conn $
-                     J.toJSObject [("type", J.showJSON "users"),
-                                   ("users", J.showJSONs (userList s))]
+  J.toJSObject [("type", J.showJSON "users"),
+                ("users", J.JSObject (J.toJSObject $
+                   map (\(user, key) -> (user, J.showJSON key)) $
+                     userList s))]
 
 sendAllUsers :: ServerState -> IO ()
-sendAllUsers s = Map.fold (\conn m -> (m >> (sendUsers conn s))) (return ()) s
+sendAllUsers s = Map.fold (\(conn, _) m ->
+                             (m >> (sendUsers conn s))) (return ()) s
 
 forwardMessage :: ServerState -> User -> String -> IO Bool
 forwardMessage s user t =
   case Map.lookup user s of
-    Just conn -> do
-                   WS.sendTextData conn $ T.pack $ t
-                   return True
+    Just (conn, _) -> do
+      WS.sendTextData conn $ T.pack $ t
+      return True
     Nothing -> return False
 
 sendError :: WS.Connection -> String -> String -> IO ()
@@ -74,9 +84,10 @@ server mstate pending = do
           if t == "join" then
             do
               name <- Map.lookup "name" jsonData
+              pubkey <- Map.lookup "pubkey" jsonData
               Just $ if usernameOK name then
                 changeState mstate $ \s ->
-                  case addUser name conn s of
+                  case addUser name (conn, pubkey) s of
                     Nothing -> do
                                  sendError conn "user already exists"
                                            jsonString
@@ -92,7 +103,6 @@ server mstate pending = do
             do
               sender <- Map.lookup "sender" jsonData
               recipient <- Map.lookup "recipient" jsonData
-              payload <- Map.lookup "payload" jsonData
               Just $ do
                 s <- readMVar mstate
                 x <- forwardMessage s recipient jsonString
