@@ -165,6 +165,7 @@ function initiate(username) {
     var s = forge.random.getBytesSync(S_LEN);
     var s_y1 = forge.random.getBytesSync(S_LEN);
     data["s"] = s;
+    // TODO pad x and y correctly, not by appending random bytes
     var x0 = forge.random.getBytesSync(X_LEN);
     x = withFirstBit(x0, 0) + s;
     data["x"] = x;
@@ -197,6 +198,7 @@ function initiate(username) {
 function respond(username) {
     var data = users.get(username);
     var n = data["n"];
+    // TODO verify that n is not too small
     var nbytes = Math.ceil(n.bitLength() / 8)
     var r = bytesToBigNum(forge.random.getBytesSync(nbytes));
     data["r"] = r;
