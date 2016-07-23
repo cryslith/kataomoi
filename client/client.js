@@ -271,7 +271,8 @@ function reveal(username) {
 
     if (like) {
         sendClient(username, {"type": "reveal",
-                              "result": "true"});
+                              "result": "true_",
+                              "s": e64(forge.random.getBytesSync(S_LEN))});
     }
     else {
         var s = w_decode.slice(1);
@@ -381,7 +382,7 @@ function receiveClient(sender, message) {
             console.log("wrong state for reveal");
             return;
         }
-        data["likemutual"] = message["result"] == "true"
+        data["likemutual"] = message["result"] == "true_"
             ? likes.LIKE : likes.DONTLIKE;
         if ("s" in message) {
             data["so"] = d64(message["s"]);
