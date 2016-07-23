@@ -117,8 +117,8 @@ Sent in response to a "respond" message
 Sent in response to a "decrypt" message
 
 * result: a boolean indicating the result of the protocol
-* s: Only present if the result is false; in that case, the value of s
-  that was extracted from x.
+* s: If the result was false, the value of s that was extracted from
+  x. Otherwise, a random value.
 
 ### confirm
 
