@@ -57,6 +57,7 @@ function signIn() {
             "<span style=\"color:red;\">" +
             "name must match ^[a-zA-Z0-9]{1,8}$" +
             "</span>";
+	return;
     }
     document.getElementById("name").innerHTML = "Welcome, " + name + "!";
 
