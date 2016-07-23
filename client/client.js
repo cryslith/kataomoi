@@ -66,6 +66,7 @@ function signIn() {
 
 function join() {
     // don't let untrusted server tell us our own key
+    // TODO: handle case where the name is already in use
     users.set(name,
               {"pubkey": keypair.publicKey.n,
                "state": states.INITIAL,
