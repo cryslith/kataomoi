@@ -311,7 +311,7 @@ function confirm(username) {
 
 function verify(username) {
     var data = users.get(username);
-    var x = data["x"]; // TODO check s from x against sh
+    var x = data["x"];
     var pubkey = rsa.setPublicKey(data["n"], seBI);
     var xe = pubkey.encrypt(x, "RAW");
 
@@ -319,6 +319,17 @@ function verify(username) {
         console.log(data["xe"].toString());
         console.log(bytesToBigNum(xe).toString());
         console.log("detected cheating via x");
+        data["state"] = states.CHEAT;
+        return;
+    }
+
+    var x_decode = forge.pkcs1.decode_rsa_oaep(pubkey, x, '');
+    var s = x_decode.slice(1);
+    var sh_md = forge.md.sha256.create();
+    sh_md.update(s);
+    var sh = sh_md.digest().bytes();
+    if (sh != data["sh"]) {
+        console.log("detected cheating via s");
         data["state"] = states.CHEAT;
         return;
     }
