@@ -11,7 +11,6 @@ var PUBLIC_EXPONENT = 0x10001;
 var eBI = new forge.jsbn.BigInteger("" + PUBLIC_EXPONENT, 10);
 var SENPAI_PUBLIC_EXPONENT = 0x10001;
 var seBI = new forge.jsbn.BigInteger("" + SENPAI_PUBLIC_EXPONENT, 10);
-var X_LEN = 32; // bytes
 var S_LEN = 32; // bytes
 
 var socket = new WebSocket("ws://127.0.0.1:8000"); // for testing
@@ -188,19 +187,19 @@ function initiate(username) {
     var s = forge.random.getBytesSync(S_LEN);
     var s_y1 = forge.random.getBytesSync(S_LEN);
     data["s"] = s;
-    // TODO pad x and y correctly, not by appending random bytes
-    var x0 = forge.random.getBytesSync(X_LEN);
-    x = withFirstBit(x0, 0) + s;
+
+    var x_raw = '\x00' + s;
+    var x = forge.pkcs1.encode_rsa_oaep(key.publicKey, x_raw, '');
     data["x"] = x;
-    var y0 = forge.random.getBytesSync(X_LEN);
+
+    var y_raw;
     if (data["like"] == likes.LIKE) {
-        y = withFirstBit(y0, 1);
-        y += s_y1;
+        y_raw = '\x01' + s_y1;
     }
     else {
-        y = withFirstBit(y0, 0);
-        y += s;
+        y_raw = '\x00' + s;
     }
+    var y = forge.pkcs1.encode_rsa_oaep(key.publicKey, y_raw, '');
 
     var n = key.publicKey.n;
     var xe = key.publicKey.encrypt(x, "RAW");
@@ -256,12 +255,15 @@ function reveal(username) {
     var rInv = data["r"].modInverse(data["n"]);
     var w = wr.multiply(rInv).mod(data["n"]);
     var w_bytes = bigNumToBytes(w);
-    var w_bytes = zero_pad(w_bytes, X_LEN + S_LEN);
-    if (w_bytes.length != X_LEN + S_LEN) {
+    var n_bytes = Math.ceil(data["n"].bitLength() / 8);
+    var w_bytes = zero_pad(w_bytes, n_bytes);
+    if (w_bytes.length != n_bytes) {
         console.log("bad w_bytes length " + w_bytes.length);
         return;
     }
-    var like = getFirstBit(w_bytes) == 1;
+    var w_decode = forge.pkcs1.decode_rsa_oaep({n: data["n"]}, w_bytes, ''); // pkcs1 wants a key object, not a bigNum
+    // TODO: catch errors from invalid OAEP
+    var like = getFirstBit(w_decode) == 1;
     data["likemutual"] = like ? likes.LIKE : likes.DONTLIKE;
 
     if (like) {
@@ -269,7 +271,7 @@ function reveal(username) {
                               "result": "true"});
     }
     else {
-        var s = w_bytes.slice(X_LEN); // TODO check s against sh
+        var s = w_decode.slice(1); // TODO check s against sh
         sendClient(username, {"type": "reveal",
                               "result": "false",
                               "s": e64(s)});
