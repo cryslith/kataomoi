@@ -273,7 +273,15 @@ function reveal(username) {
                               "result": "true"});
     }
     else {
-        var s = w_decode.slice(1); // TODO check s against sh
+        var s = w_decode.slice(1);
+        var sh_md = forge.md.sha256.create();
+        sh_md.update(s);
+        var sh = sh_md.digest().bytes();
+        if (sh != data["sh"]) {
+            console.log("detected cheating via s");
+            data["state"] = states.CHEAT;
+            return;
+        }
         sendClient(username, {"type": "reveal",
                               "result": "false",
                               "s": e64(s)});
