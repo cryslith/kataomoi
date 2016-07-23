@@ -6,7 +6,8 @@ var likes = {UNKNOWN: "unknown", DONTLIKE: 0, LIKE: 1};
 var rsa = forge.pki.rsa;
 var e64 = forge.util.encode64;
 var d64 = forge.util.decode64;
-var NBITS = 1024;
+var TUNNEL_BITS = 2048;
+var SENPAI_BITS = 1024; // RSA in JS is really slow; the outer layer of crypto protects us from the NSA, and your crush probably doesn't have a supercomputer
 var PUBLIC_EXPONENT = 0x10001;
 var eBI = new forge.jsbn.BigInteger("" + PUBLIC_EXPONENT, 10);
 var SENPAI_PUBLIC_EXPONENT = 0x10001;
@@ -16,7 +17,7 @@ var S_LEN = 32; // bytes
 var socket = new WebSocket("ws://127.0.0.1:8000"); // for testing
 var users = new Map();
 var name = undefined;
-var keypair = rsa.generateKeyPair({bits: NBITS, e: PUBLIC_EXPONENT});
+var keypair = rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT});
 
 
 socket.onmessage = receiveServer_raw;
@@ -182,7 +183,7 @@ function getFirstBit(bytes) {
 
 function initiate(username) {
     var data = users.get(username);
-    var key = rsa.generateKeyPair({bits: NBITS, e: SENPAI_PUBLIC_EXPONENT});
+    var key = rsa.generateKeyPair({bits: SENPAI_BITS, e: SENPAI_PUBLIC_EXPONENT});
     data["keypair"] = key;
     var s = forge.random.getBytesSync(S_LEN);
     var s_y1 = forge.random.getBytesSync(S_LEN);
