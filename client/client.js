@@ -263,7 +263,8 @@ function reveal(username) {
         console.log("bad w_bytes length " + w_bytes.length);
         return;
     }
-    var w_decode = forge.pkcs1.decode_rsa_oaep({n: data["n"]}, w_bytes, ''); // pkcs1 wants a key object, not a bigNum
+    var pubkey = rsa.setPublicKey(data["n"], seBI);
+    var w_decode = forge.pkcs1.decode_rsa_oaep(pubkey, w_bytes, '');
     // TODO: catch errors from invalid OAEP
     var like = getFirstBit(w_decode) == 1;
     data["likemutual"] = like ? likes.LIKE : likes.DONTLIKE;
