@@ -14,6 +14,7 @@ var SENPAI_PUBLIC_EXPONENT = 0x10001;
 var seBI = new forge.jsbn.BigInteger("" + SENPAI_PUBLIC_EXPONENT, 10);
 var S_LEN = 32; // bytes
 
+// TODO: use wss so NSA can't spy on the social graph
 var socket = new WebSocket("ws://127.0.0.1:8000"); // for testing
 var users = new Map();
 var name = undefined;
