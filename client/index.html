@@ -3,6 +3,7 @@
         <title>kataomoi</title>
         <script type="text/javascript" src="forge.min.js"></script>
         <script type="text/javascript" src="client.js"></script>
+        <link rel="stylesheet" href="kataomoi.css"/>
     </head>
     <body>
         <div id="signin">
@@ -12,10 +13,12 @@
                 <input type="submit" value="Sign In"/>
             </form>
         </div>
-        <h2 id="name"></h2>
-        <h2>Users Online:</h2>
-        <div id="users"></div>
-	<h3>Verification Phrase (make sure this is the same for everyone):</h3>
-	<div id="phrase"></div>
+        <h2 id="name" style="display:none;"></h2>
+        <div id="users" style="display:none;">
+            <h2>Users Online:</h2>
+            <div id="userlist"></div>
+            <h3>Verification Phrase (make sure this is the same for everyone; if it isn't, someone may be eavesdropping or tampering with your connection):</h3>
+            <div id="phrase"></div>
+        </div>
     </body>
 </html>

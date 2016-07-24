@@ -40,8 +40,9 @@ function receiveServer(data) {
                        "like": likes.UNKNOWN,
                        "likesus": likes.UNKNOWN});
             document.getElementById("signin").style = "display:none;";
+            document.getElementById("name").style = "";
             document.getElementById("name").innerHTML = "Welcome, " + name + "!";
-            document.getElementById("users").innerHTML = userList(users); // in case we process "users" message before "welcome" message
+            showUsers(users); // in case we process "users" message before our own name is confirmed by "welcome"
         } else {
             console.log("server tried to assign us unrequested name: " + data["name"]);
         }
@@ -59,8 +60,7 @@ function receiveServer(data) {
         break;
     case "users":
         updateUsers(users, data["users"]);
-        var uList = userList(users)
-        document.getElementById("users").innerHTML = uList;
+        showUsers(users);
         break;
     case "client":
         if (data["recipient"] != name) {
@@ -99,23 +99,38 @@ function usernameOK(username) {
     return /^[a-zA-Z0-9]{1,8}$/.test(username);
 }
 
+function showUsers(users) {
+    document.getElementById("users").style = "";
+    document.getElementById("userlist").innerHTML = userList(users);
+}
+
 function userList(users) {
     return "<form name=\"selection\" " +
         "onsubmit=\"selections()\" " +
         "action=\"javascript:void(0);\">" +
+        "<table>" +
+        "<tr><td class=\"user\"><b>User</b></td>" +
+        "<td class=\"dtf\"><b>DTF?</b></td></tr>" +
         [...users].map(function([user, data]) {
             if (user == name) {
-                return user + " (you)<br>";
+                return "<tr>" +
+                    "<td class=\"user\">" + user + "</td>" +
+                    "<td class=\"dtf\">(you)</td>" +
+                    "</tr>";
             }
             else {
-                return "<label for=\"button_" + user + "\">" +
-                    user + "</label>" +
+                return "<tr>" +
+                    "<td class=\"user\">" +
+                    "<label for=\"button_" + user + "\">" +
+                    user + "</label></td>" +
+                    "<td class=\"dtf\">" +
                     "<input type=\"checkbox\" name=\"" + user +
                     "\" id=\"button_" + user + "\">" +
                     "<span id=\"result_" + user + "\"></span>" +
-                    "<br>";
+                    "</td></tr>";
             }
         }).join("") +
+        "</table>" +
         "<input type=\"submit\" value=\"Send choices\">" +
         "</form>";
 }
