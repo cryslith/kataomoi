@@ -18,6 +18,7 @@ var S_LEN = 32; // bytes
 var socket = new WebSocket("ws://127.0.0.1:8000"); // for testing
 var users = new Map();
 var name = undefined;
+var requestedName = undefined;
 var keypair = rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT});
 
 
@@ -30,6 +31,32 @@ function receiveServer_raw(event) {
 
 function receiveServer(data) {
     switch (data["type"]) {
+    case "welcome":
+        if (data["name"] == requestedName) {
+            name = data["name"];
+            users.set(name,
+                      {"pubkey": keypair.publicKey.n,
+                       "state": states.INITIAL,
+                       "like": likes.UNKNOWN,
+                       "likesus": likes.UNKNOWN});
+            document.getElementById("signin").style = "display:none;";
+            document.getElementById("name").innerHTML = "Welcome, " + name + "!";
+            document.getElementById("users").innerHTML = userList(users); // in case we process "users" message before "welcome" message
+        } else {
+            console.log("server tried to assign us unrequested name: " + data["name"]);
+        }
+        break;
+    case "unavailable":
+        if (data["name"] == requestedName) {
+            document.getElementById("name").innerHTML =
+            "<span style=\"color:red;\">" +
+                "The username " + data["name"] + " is unavailable. " +
+                "Please choose a different name."
+            "</span>";
+        } else {
+            console.log("server rejected unrequested name: " + data["name"]);
+        }
+        break;
     case "users":
         updateUsers(users, data["users"]);
         var uList = userList(users)
@@ -52,28 +79,19 @@ function receiveServer(data) {
 }
 
 function signIn() {
-    name = document.forms["signin"]["name"].value;
-    if (!usernameOK(name)) {
+    requestedName = document.forms["signin"]["name"].value;
+    if (!usernameOK(requestedName)) {
         document.getElementById("name").innerHTML =
             "<span style=\"color:red;\">" +
             "name must match ^[a-zA-Z0-9]{1,8}$" +
             "</span>";
         return;
     }
-    document.getElementById("name").innerHTML = "Welcome, " + name + "!";
-
     join();
 }
 
 function join() {
-    // don't let untrusted server tell us our own key
-    // TODO: handle case where the name is already in use
-    users.set(name,
-              {"pubkey": keypair.publicKey.n,
-               "state": states.INITIAL,
-               "like": likes.UNKNOWN,
-               "likesus": likes.UNKNOWN});
-    sendServer({"type": "join", "name": name,
+    sendServer({"type": "join", "name": requestedName,
                 "pubkey": e64(bigNumToBytes(keypair.publicKey.n))});
 }
 
