@@ -46,6 +46,24 @@ the client's websocket and remove them from the list of users.
 
 ## Server-to-client message types
 
+### welcome
+
+Acknowledges a "join" message, and indicates that the client has been
+added to the list of users with the requested name.
+
+Fields:
+
+* name: the requested name
+
+### unavailable
+
+Sent in response to a "join" message, indicating that the requested
+username is unavailable.
+
+Fields:
+
+* name: the requested name
+
 ### users
 
 Provides a list of users currently signed in. Sent to all clients

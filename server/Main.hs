@@ -61,6 +61,16 @@ forwardMessage s user t =
       return True
     Nothing -> return False
 
+sendWelcome :: WS.Connection -> String -> IO ()
+sendWelcome conn n = send conn $
+                     J.toJSObject [("type", J.showJSON "welcome"),
+                                   ("name", J.showJSON n)]
+
+sendUnavailable :: WS.Connection -> String -> IO ()
+sendUnavailable conn n = send conn $
+                         J.toJSObject [("type", J.showJSON "unavailable"),
+                                       ("name", J.showJSON n)]
+
 sendError :: WS.Connection -> String -> String -> IO ()
 sendError conn s m = send conn $
                      J.toJSObject [("type", J.showJSON "error"),
@@ -89,12 +99,12 @@ server mstate pending = do
                 changeState mstate $ \s ->
                   case addUser name (conn, pubkey) s of
                     Nothing -> do
-                                 sendError conn "user already exists"
-                                           jsonString
+                                 sendUnavailable conn name
                                  return s
                     Just s' -> do
                                  n <- readIORef nameRef
                                  writeIORef nameRef $ Just name
+                                 sendWelcome conn name
                                  return $ case n of
                                             Nothing -> s'
                                             Just n' -> removeUser n' s'
