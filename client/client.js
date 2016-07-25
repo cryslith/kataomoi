@@ -1,7 +1,8 @@
 var states = {INITIAL: "initial", INITIATED: "initiated",
               THEYINITIATED: "theyinitiated",
               RESPONDED: "responded", DECRYPTED: "decrypted",
-              REVEALED: "revealed", CONFIRMED: "confirmed"};
+              REVEALED: "revealed", CONFIRMED: "confirmed",
+              CHEAT: "cheat"};
 var likes = {UNKNOWN: "unknown", DONTLIKE: 0, LIKE: 1};
 var rsa = forge.pki.rsa;
 var e64 = forge.util.encode64;
@@ -110,12 +111,14 @@ function userList(users) {
         "action=\"javascript:void(0);\">" +
         "<table>" +
         "<tr><td class=\"user\"><b>User</b></td>" +
-        "<td class=\"dtf\"><b>DTF?</b></td></tr>" +
+        "<td class=\"dtf\"><b>DTF?</b></td>" +
+        "<td class=\"result\"><b>Result</b></td></tr>" +
         [...users].map(function([user, data]) {
             if (user == name) {
                 return "<tr>" +
                     "<td class=\"user\">" + user + "</td>" +
                     "<td class=\"dtf\">(you)</td>" +
+                    "<td class=\"result\"></td>" +
                     "</tr>";
             }
             else {
@@ -125,8 +128,9 @@ function userList(users) {
                     user + "</label></td>" +
                     "<td class=\"dtf\">" +
                     "<input type=\"checkbox\" name=\"" + user +
-                    "\" id=\"button_" + user + "\">" +
-                    "<span id=\"result_" + user + "\"></span>" +
+                    "\" id=\"button_" + user + "\"></td>" +
+                    "<td class=\"result\" id=\"result_"
+                    + user + "\"></td>" +
                     "</td></tr>";
             }
         }).join("") +
@@ -179,13 +183,14 @@ function selections() {
         if (username == name) {
             continue;
         }
+        var checkbox = document.getElementById("button_" + username);
         if (data["state"] == states.INITIAL ||
             data["state"] == states.THEYINITIATED) {
             data["like"] =
-                document.getElementById("button_" + username).checked ?
-                likes.LIKE : likes.DONTLIKE;
+                checkbox.checked ? likes.LIKE : likes.DONTLIKE;
             sendSelection(username);
         }
+        checkbox.disabled = true;
     }
 }
 
@@ -194,14 +199,16 @@ function sendSelection(username) {
     switch (state) {
     case states.INITIAL:
         initiate(username);
-        return;
+        break;
     case states.THEYINITIATED:
         respond(username);
-        return;
+        break;
     default:
         console.log("invalid state " + state);
-        return;
+        break;
     }
+
+    displayResult(username);
 }
 
 function withFirstBit(bytes, b) {
@@ -402,29 +409,29 @@ function receiveClient(sender, message) {
             break;
         default:
             console.log("wrong state for initiate");
-            return;
+            break;
         }
-        return;
+        break;
     case "respond":
         if (data["state"] != states.INITIATED) {
             console.log("wrong state for respond");
-            return;
+            break;
         }
         data["wre"] = bytesToBigNum(d64(message["wre"]));
         decrypt(sender);
-        return;
+        break;
     case "decrypt":
         if (data["state"] != states.RESPONDED) {
             console.log("wrong state for decrypt");
-            return;
+            break;
         }
         data["wr"] = bytesToBigNum(d64(message["wr"]));
         reveal(sender);
-        return;
+        break;
     case "reveal":
         if (data["state"] != states.DECRYPTED) {
             console.log("wrong state for reveal");
-            return;
+            break;
         }
         data["likemutual"] = message["result"] == "true_"
             ? likes.LIKE : likes.DONTLIKE;
@@ -432,21 +439,21 @@ function receiveClient(sender, message) {
             data["so"] = d64(message["s"]);
         }
         confirm(sender);
-        displayResult(sender);
-        return;
+        break;
     case "confirm":
         if (data["state"] != states.REVEALED) {
             console.log("wrong state for confirm");
-            return;
+            break;
         }
         data["x"] = d64(message["x"]);
         verify(sender);
-        displayResult(sender);
-        return;
+        break;
     default:
         console.log("invalid message type");
-        return;
+        break;
     }
+
+    displayResult(sender);
 }
 
 function bytesToBigNum(x) {
@@ -475,15 +482,36 @@ function bigNumToBytes(y) {
 
 function displayResult(username) {
     var data = users.get(username);
-    if (data["state"] == states.CONFIRMED) {
-        result = data["likemutual"] == likes.LIKE;
-        document.getElementById("result_" + username).innerHTML = result ?
-            "yay" : "nay";
+    var result = "";
+    switch(data["state"]) {
+    case states.INITIAL:
+        result = "";
+        break;
+    case states.INITIATED:
+        result = "Waiting for response...";
+        break;
+    case states.THEYINITIATED:
+        result = "Awaiting your response...";
+        break;
+    case states.RESPONDED:
+    case states.DECRYPTED:
+        result = "Processing...";
+        break;
+    case states.REVEALED:
+    case states.CONFIRMED:
+        result = data["likemutual"] == likes.LIKE ?
+            "<span style=\"color:green;\">Yes</span>" :
+            "No";
+        if (data["state"] != states.CONFIRMED) {
+            result += " (Waiting for final verification...)";
+        }
+        break;
+    case states.CHEAT:
+        result = "<span style=\"color:red;\">CHEATING DETECTED</span>";
+        break;
     }
-    else if (data["state"] == states.CHEAT) {
-        document.getElementById("result_" + username).innerHTML =
-            "<span style=\"color:red\">detected cheating</span>";
-    }
+
+    document.getElementById("result_" + username).innerHTML = result;
 }
 
 function encodePayload(recipient, message) {
