@@ -1,3 +1,11 @@
 td.user {
     width: 10em;
 }
+
+td.dtf {
+    width: 6em;
+}
+
+td.result {
+    width: 30em;
+}
