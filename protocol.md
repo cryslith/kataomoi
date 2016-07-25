@@ -33,10 +33,10 @@ A "join" message is sent by the client when they sign in to the
 server. Its fields are:
 
 * name: the name the user wishes to be known by. This must be a string
-  of nonzero length, containing only alphanumeric characters, spaces,
-  hyphens, and underscores.
+  1-8 characters long, containing only alphanumeric characters.
 * pubkey: an RSA modulus, encoded as a string of base 64 digits. This
-  will be the user's public key for wrapping all messages
+  will be the user's public key for wrapping all client-to-client
+  messages.
 
 ### quit
 
