@@ -41,8 +41,8 @@ function receiveServer(data) {
                        "like": likes.UNKNOWN,
                        "likesus": likes.UNKNOWN});
             document.getElementById("signin").style = "display:none;";
-            document.getElementById("name").style = "";
             document.getElementById("name").innerHTML = "Welcome, " + name + "!";
+            document.getElementById("users").style = "";
             showUsers(users); // in case we process "users" message before our own name is confirmed by "welcome"
         } else {
             console.log("server tried to assign us unrequested name: " + data["name"]);
@@ -101,7 +101,6 @@ function usernameOK(username) {
 }
 
 function showUsers(users) {
-    document.getElementById("users").style = "";
     document.getElementById("userlist").innerHTML = userList(users);
 }
 
