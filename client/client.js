@@ -267,7 +267,7 @@ function respond(username) {
         return;
     }
     var nbytes = Math.ceil(n.bitLength() / 8);
-    var r = bytesToBigNum(forge.random.getBytesSync(nbytes));
+    var r = bytesToBigNum(forge.random.getBytesSync(nbytes+4)).mod(n);
     data["r"] = r;
     var re = r.modPow(seBI, n);
     var we = data["like"] == likes.LIKE ? data["ye"] : data["xe"];
