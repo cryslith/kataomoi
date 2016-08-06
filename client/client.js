@@ -261,8 +261,12 @@ function initiate(username) {
 function respond(username) {
     var data = users.get(username);
     var n = data["n"];
-    // TODO verify that n is not too small
-    var nbytes = Math.ceil(n.bitLength() / 8)
+    if (!(n.gcd(data["ye"]).equals(forge.jsbn.BigInteger.ONE) &&
+          n.gcd(data["xe"]).equals(forge.jsbn.BigInteger.ONE))) {
+        data["state"] = states.CHEAT;
+        return;
+    }
+    var nbytes = Math.ceil(n.bitLength() / 8);
     var r = bytesToBigNum(forge.random.getBytesSync(nbytes));
     data["r"] = r;
     var re = r.modPow(seBI, n);
