@@ -33,7 +33,7 @@ function receiveServer_raw(event) {
 function receiveServer(data) {
     switch (data["type"]) {
     case "welcome":
-        if (data["name"] == requestedName) {
+        if (data["name"] === requestedName) {
             name = data["name"];
             users.set(name,
                       {"pubkey": keypair.publicKey.n,
@@ -49,7 +49,7 @@ function receiveServer(data) {
         }
         break;
     case "unavailable":
-        if (data["name"] == requestedName) {
+        if (data["name"] === requestedName) {
             document.getElementById("name").innerHTML =
             "<span style=\"color:red;\">" +
                 "The username " + data["name"] + " is unavailable. " +
@@ -113,7 +113,7 @@ function userList(users) {
         "<td class=\"dtf\"><b>DTF?</b></td>" +
         "<td class=\"result\"><b>Result</b></td></tr>" +
         [...users].map(function([user, data]) {
-            if (user == name) {
+            if (user === name) {
                 return "<tr>" +
                     "<td class=\"user\">" + user + "</td>" +
                     "<td class=\"dtf\">(you)</td>" +
@@ -179,12 +179,12 @@ function updateUsers(users, newUsernames) {
 
 function selections() {
     for (var [username, data] of users) {
-        if (username == name) {
+        if (username === name) {
             continue;
         }
         var checkbox = document.getElementById("button_" + username);
-        if (data["state"] == states.INITIAL ||
-            data["state"] == states.THEYINITIATED) {
+        if (data["state"] === states.INITIAL ||
+            data["state"] === states.THEYINITIATED) {
             data["like"] =
                 checkbox.checked ? likes.LIKE : likes.DONTLIKE;
             sendSelection(username);
@@ -234,7 +234,7 @@ function initiate(username) {
     data["x"] = x;
 
     var y_raw;
-    if (data["like"] == likes.LIKE) {
+    if (data["like"] === likes.LIKE) {
         y_raw = '\x01' + s_y1;
     }
     else {
@@ -270,7 +270,7 @@ function respond(username) {
     var r = bytesToBigNum(forge.random.getBytesSync(nbytes+4)).mod(n);
     data["r"] = r;
     var re = r.modPow(seBI, n);
-    var we = data["like"] == likes.LIKE ? data["ye"] : data["xe"];
+    var we = data["like"] === likes.LIKE ? data["ye"] : data["xe"];
     var wre = re.multiply(we).mod(n);
 
     sendClient(username, {"type": "respond",
@@ -309,7 +309,7 @@ function reveal(username) {
     var pubkey = rsa.setPublicKey(data["n"], seBI);
     var w_decode = forge.pkcs1.decode_rsa_oaep(pubkey, w_bytes, '');
     // TODO: catch errors from invalid OAEP
-    var like = getFirstBit(w_decode) == 1;
+    var like = getFirstBit(w_decode) === 1;
     data["likemutual"] = like ? likes.LIKE : likes.DONTLIKE;
 
     if (like) {
@@ -338,7 +338,7 @@ function reveal(username) {
 
 function confirm(username) {
     var data = users.get(username);
-    if (data["likemutual"] == likes.DONTLIKE) {
+    if (data["likemutual"] === likes.DONTLIKE) {
         if (data["so"] != data["s"]) {
             console.log("detected cheating via s");
             data["state"] = states.CHEAT;
@@ -436,7 +436,7 @@ function receiveClient(sender, message) {
             console.log("wrong state for reveal");
             break;
         }
-        data["likemutual"] = message["result"] == "true_"
+        data["likemutual"] = message["result"] === "true_"
             ? likes.LIKE : likes.DONTLIKE;
         if ("s" in message) {
             data["so"] = d64(message["s"]);
@@ -502,7 +502,7 @@ function displayResult(username) {
         break;
     case states.REVEALED:
     case states.CONFIRMED:
-        result = data["likemutual"] == likes.LIKE ?
+        result = data["likemutual"] === likes.LIKE ?
             "<span style=\"color:green;\">Yes</span>" :
             "No";
         if (data["state"] != states.CONFIRMED) {
