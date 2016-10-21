@@ -64,7 +64,7 @@ function receiveServer(data) {
         showUsers(users);
         break;
     case "client":
-        if (data["recipient"] != name) {
+        if (data["recipient"] !== name) {
             console.log("spurious message");
             return;
         }
@@ -141,7 +141,7 @@ function userList(users) {
 function updateUsers(users, newUsernames) {
     for (var username in newUsernames) {
         if (usernameOK(username)) {
-            if (!users.has(username) && username != name) { // don't let server tell us our key
+            if (!users.has(username) && username !== name) { // don't let server tell us our key
                 users.set(username,
                           {"pubkey":
                            bytesToBigNum(d64(newUsernames[username])),
@@ -156,7 +156,7 @@ function updateUsers(users, newUsernames) {
     }
 
     [...users].forEach(function([username, data]) {
-        if (!(username in newUsernames) && username != name) {
+        if (!(username in newUsernames) && username !== name) {
             users.delete(username);
         }
     });
@@ -302,7 +302,7 @@ function reveal(username) {
     var w_bytes = bigNumToBytes(w);
     var n_bytes = Math.ceil(data["n"].bitLength() / 8);
     var w_bytes = zero_pad(w_bytes, n_bytes);
-    if (w_bytes.length != n_bytes) {
+    if (w_bytes.length !== n_bytes) {
         console.log("bad w_bytes length " + w_bytes.length);
         return;
     }
@@ -322,7 +322,7 @@ function reveal(username) {
         var sh_md = forge.md.sha256.create();
         sh_md.update(s);
         var sh = sh_md.digest().bytes();
-        if (sh != data["sh"]) {
+        if (sh !== data["sh"]) {
             console.log("detected cheating via s");
             data["state"] = states.CHEAT;
             return;
@@ -339,7 +339,7 @@ function reveal(username) {
 function confirm(username) {
     var data = users.get(username);
     if (data["likemutual"] === likes.DONTLIKE) {
-        if (data["so"] != data["s"]) {
+        if (data["so"] !== data["s"]) {
             console.log("detected cheating via s");
             data["state"] = states.CHEAT;
             return;
@@ -358,7 +358,7 @@ function verify(username) {
     var pubkey = rsa.setPublicKey(data["n"], seBI);
     var xe = pubkey.encrypt(x, "RAW");
 
-    if (data["xe"].toString() != bytesToBigNum(xe).toString()) {
+    if (data["xe"].toString() !== bytesToBigNum(xe).toString()) {
         console.log(data["xe"].toString());
         console.log(bytesToBigNum(xe).toString());
         console.log("detected cheating via x");
@@ -371,7 +371,7 @@ function verify(username) {
     var sh_md = forge.md.sha256.create();
     sh_md.update(s);
     var sh = sh_md.digest().bytes();
-    if (sh != data["sh"]) {
+    if (sh !== data["sh"]) {
         console.log("detected cheating via s");
         data["state"] = states.CHEAT;
         return;
@@ -416,7 +416,7 @@ function receiveClient(sender, message) {
         }
         break;
     case "respond":
-        if (data["state"] != states.INITIATED) {
+        if (data["state"] !== states.INITIATED) {
             console.log("wrong state for respond");
             break;
         }
@@ -424,7 +424,7 @@ function receiveClient(sender, message) {
         decrypt(sender);
         break;
     case "decrypt":
-        if (data["state"] != states.RESPONDED) {
+        if (data["state"] !== states.RESPONDED) {
             console.log("wrong state for decrypt");
             break;
         }
@@ -432,7 +432,7 @@ function receiveClient(sender, message) {
         reveal(sender);
         break;
     case "reveal":
-        if (data["state"] != states.DECRYPTED) {
+        if (data["state"] !== states.DECRYPTED) {
             console.log("wrong state for reveal");
             break;
         }
@@ -444,7 +444,7 @@ function receiveClient(sender, message) {
         confirm(sender);
         break;
     case "confirm":
-        if (data["state"] != states.REVEALED) {
+        if (data["state"] !== states.REVEALED) {
             console.log("wrong state for confirm");
             break;
         }
@@ -505,7 +505,7 @@ function displayResult(username) {
         result = data["likemutual"] === likes.LIKE ?
             "<span style=\"color:green;\">Yes</span>" :
             "No";
-        if (data["state"] != states.CONFIRMED) {
+        if (data["state"] !== states.CONFIRMED) {
             result += " (Waiting for final verification...)";
         }
         break;
