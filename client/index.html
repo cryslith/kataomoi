@@ -16,7 +16,16 @@
         <h2 id="name"></h2>
         <div id="users" style="display:none;">
             <h2>Users Online:</h2>
-            <div id="userlist"></div>
+            <form name="selections" onsubmit="sendSelections()" action="javascript:void(0);">
+                <table id="userlist">
+                    <tr style="font-weight: bold">
+                        <td class="user">User</td>
+                        <td class="dtf">DTF?</td>
+                        <td class="result">Result</td>
+                    </tr>
+                </table>
+                <input type="submit" value="Send choices">
+            </form>
             <h3>Verification Phrase (make sure this is the same for everyone; if it isn't, someone may be eavesdropping or tampering with your connection):</h3>
             <div id="phrase"></div>
         </div>
