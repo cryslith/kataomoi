@@ -4,6 +4,7 @@ var states = {INITIAL: "initial", INITIATED: "initiated",
               REVEALED: "revealed", CONFIRMED: "confirmed",
               CHEAT: "cheat"};
 var likes = {UNKNOWN: "unknown", DONTLIKE: 0, LIKE: 1};
+var msgcolors = {INFO: "", SUCCESS: "green", ERROR: "red"};
 var rsa = forge.pki.rsa;
 var e64 = forge.util.encode64;
 var d64 = forge.util.decode64;
@@ -32,36 +33,27 @@ function receiveServer_raw(event) {
 
 function receiveServer(data) {
     switch (data["type"]) {
+    // XXX deal with server sending us these messages at inappropriate times
     case "welcome":
         if (data["name"] === requestedName) {
             name = data["name"];
-            users.set(name,
-                      {"pubkey": keypair.publicKey.n,
-                       "state": states.INITIAL,
-                       "like": likes.UNKNOWN,
-                       "likesus": likes.UNKNOWN});
-            document.getElementById("signin").style = "display:none;";
-            document.getElementById("name").innerHTML = "Welcome, " + name + "!";
-            document.getElementById("users").style = "";
-            showUsers(users); // in case we process "users" message before our own name is confirmed by "welcome"
+            newUser(name, keypair.publicKey.n);
+            hide("signin");
+            showMessage("name", "Welcome, " + name + "!", msgcolors.INFO);
+            show("users");
         } else {
             console.log("server tried to assign us unrequested name: " + data["name"]);
         }
         break;
     case "unavailable":
         if (data["name"] === requestedName) {
-            document.getElementById("name").innerHTML =
-            "<span style=\"color:red;\">" +
-                "The username " + data["name"] + " is unavailable. " +
-                "Please choose a different name."
-            "</span>";
+            showMessage("name", "The username " + data["name"] + " is unavailable. Please choose a different name.", msgcolors.ERROR);
         } else {
             console.log("server rejected unrequested name: " + data["name"]);
         }
         break;
     case "users":
         updateUsers(users, data["users"]);
-        showUsers(users);
         break;
     case "client":
         if (data["recipient"] !== name) {
@@ -82,10 +74,7 @@ function receiveServer(data) {
 function signIn() {
     requestedName = document.forms["signin"]["name"].value;
     if (!usernameOK(requestedName)) {
-        document.getElementById("name").innerHTML =
-            "<span style=\"color:red;\">" +
-            "name must match ^[a-zA-Z0-9]{1,8}$" +
-            "</span>";
+        showMessage("name", "Name must be 1-8 alphanumeric characters", msgcolors.ERROR);
         return;
     }
     join();
@@ -100,54 +89,11 @@ function usernameOK(username) {
     return /^[a-zA-Z0-9]{1,8}$/.test(username);
 }
 
-function showUsers(users) {
-    document.getElementById("userlist").innerHTML = userList(users);
-}
-
-function userList(users) {
-    return "<form name=\"selection\" " +
-        "onsubmit=\"selections()\" " +
-        "action=\"javascript:void(0);\">" +
-        "<table>" +
-        "<tr><td class=\"user\"><b>User</b></td>" +
-        "<td class=\"dtf\"><b>DTF?</b></td>" +
-        "<td class=\"result\"><b>Result</b></td></tr>" +
-        [...users].map(function([user, data]) {
-            if (user === name) {
-                return "<tr>" +
-                    "<td class=\"user\">" + user + "</td>" +
-                    "<td class=\"dtf\">(you)</td>" +
-                    "<td class=\"result\"></td>" +
-                    "</tr>";
-            }
-            else {
-                return "<tr>" +
-                    "<td class=\"user\">" +
-                    "<label for=\"button_" + user + "\">" +
-                    user + "</label></td>" +
-                    "<td class=\"dtf\">" +
-                    "<input type=\"checkbox\" name=\"" + user +
-                    "\" id=\"button_" + user + "\"></td>" +
-                    "<td class=\"result\" id=\"result_"
-                    + user + "\"></td>" +
-                    "</td></tr>";
-            }
-        }).join("") +
-        "</table>" +
-        "<input type=\"submit\" value=\"Send choices\">" +
-        "</form>";
-}
-
 function updateUsers(users, newUsernames) {
     for (var username in newUsernames) {
         if (usernameOK(username)) {
             if (!users.has(username) && username !== name) { // don't let server tell us our key
-                users.set(username,
-                          {"pubkey":
-                           bytesToBigNum(d64(newUsernames[username])),
-                           "state": states.INITIAL,
-                           "like": likes.UNKNOWN,
-                           "likesus": likes.UNKNOWN});
+                newUser(username, bytesToBigNum(d64(newUsernames[username])));
             }
         }
         else {
@@ -155,6 +101,7 @@ function updateUsers(users, newUsernames) {
         }
     }
 
+    // XXX get rid of this bit once we have rooms
     [...users].forEach(function([username, data]) {
         if (!(username in newUsernames) && username !== name) {
             users.delete(username);
@@ -162,6 +109,7 @@ function updateUsers(users, newUsernames) {
     });
 
     // update verification phrase
+    // XXX include room name, user connection status
     var userKeys = [...users].map(function(currentValue, index, array) {
         return [currentValue[0], e64(bigNumToBytes(currentValue[1]["pubkey"]))];
     });
@@ -174,14 +122,24 @@ function updateUsers(users, newUsernames) {
         }
         return 0;
     });
-    document.getElementById("phrase").innerHTML = hashPhrase(JSON.stringify(userKeys));
+    showMessage("phrase", hashPhrase(JSON.stringify(userKeys)), msgcolors.INFO);
 }
 
-function selections() {
+function newUser(username, pubkey) {
+    users.set(username,
+              {"pubkey": pubkey,
+               "state": states.INITIAL,
+               "like": likes.UNKNOWN,
+               "likemutual": likes.UNKNOWN});
+    addUserRow(username);
+}
+
+function sendSelections() {
     for (var [username, data] of users) {
         if (username === name) {
             continue;
         }
+        // XXX don't send for disconnected users
         var checkbox = document.getElementById("button_" + username);
         if (data["state"] === states.INITIAL ||
             data["state"] === states.THEYINITIATED) {
@@ -486,6 +444,7 @@ function bigNumToBytes(y) {
 function displayResult(username) {
     var data = users.get(username);
     var result = "";
+    var msgcolor = msgcolors.INFO;
     switch(data["state"]) {
     case states.INITIAL:
         result = "";
@@ -502,20 +461,79 @@ function displayResult(username) {
         break;
     case states.REVEALED:
     case states.CONFIRMED:
-        result = data["likemutual"] === likes.LIKE ?
-            "<span style=\"color:green;\">Yes</span>" :
-            "No";
+        if (data["likemutual"] === likes.LIKE) {
+            result = "Yes";
+            msgcolor = msgcolors.SUCCESS;
+        } else {
+            result = "No";
+        }
         if (data["state"] !== states.CONFIRMED) {
             result += " (Waiting for final verification...)";
         }
         break;
     case states.CHEAT:
-        result = "<span style=\"color:red;\">CHEATING DETECTED</span>";
+        result = "CHEATING DETECTED";
+        msgcolor = msgcolors.ERROR;
         break;
     }
 
-    document.getElementById("result_" + username).innerHTML = result;
+    showMessage("result_" + username, result, msgcolor);
 }
+
+
+// DOM manipulation wrappers
+
+function showMessage(id, message, color) {
+    var el = document.getElementById(id);
+    el.textContent = message;
+    el.style.color = color;
+    el.style.display = "";
+}
+
+function show(id) {
+    document.getElementById(id).style.display = "";
+}
+
+function hide(id) {
+    document.getElementById(id).style.display = "none";
+}
+
+function addUserRow(username) {
+    var row = document.createElement("tr");
+    var nameCell = document.createElement("td");
+    var dtfCell = document.createElement("td");
+    var resultCell = document.createElement("td");
+    row.appendChild(nameCell);
+    row.appendChild(dtfCell);
+    row.appendChild(resultCell);
+
+    nameCell.className = "user";
+    dtfCell.className = "dtf";
+    resultCell.className = "result";
+    resultCell.id = "result_" + username;
+
+    if (username == name) {
+        nameCell.textContent = name;
+        dtfCell.textContent = "(you)";
+    } else {
+        var nameLabel = document.createElement("label");
+        var checkbox = document.createElement("input");
+        nameCell.appendChild(nameLabel);
+        dtfCell.appendChild(checkbox);
+
+        checkbox.type = "checkbox";
+        checkbox.name = username;
+        checkbox.id = "button_" + username;
+        nameLabel.htmlFor = checkbox.id;
+
+        nameLabel.textContent = username;
+    }
+
+    document.getElementById("userlist").appendChild(row);
+}
+
+
+// Crypto wrappers
 
 function encodePayload(recipient, message) {
     var plaintext = JSON.stringify(message);
