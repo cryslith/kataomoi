@@ -18,6 +18,44 @@ All communication is performed using WebSockets; clients send JSON
 data to the server, which processes it and passes it on to the
 appropriate recipient.
 
+## Protocol design
+
+kataomoi's protocol is based around "rooms" containing "users".  A
+room is a unique identifying string associated with a non-empty set of
+users.  A user is an identifying string associated with a websocket,
+an RSA public key, and a connection status (connected or
+disconnected).  A user must belong to exactly one room, and a room
+must contain at least one connected user.  Note that no two rooms on
+the server can have the same name, and no two users within a single
+room can have the same name; however, users in different rooms can
+have the same name.
+
+A client begins by generating an RSA keypair; they then establish a
+websocket connection to the server, and send a message specifying a
+room name and username and containing their public key.  If the
+requested room does not exist, it is created.  If the requested
+username is available within the requested room, the client's
+combination of username, websocket, and public key is added to the
+room as a new connected user.
+
+Once a user is in a room, they can send the server messages to be
+passed on to other connected users in the same room.  The server
+provides the client with a list of users in the current room; users in
+other rooms are not visible to the client.  Messages between users are
+end-to-end encrypted and signed using the provided RSA keys, such that
+they can't be read or modified by the server.  In our client
+implementation, these messages are used to conduct SENPAI exchanges,
+but in theory, non-spec-conformant clients could exchange any type of
+message; the kataomoi server simply provides a simple encrypted chat
+service.
+
+When a user's websocket becomes disconnected, their connection status
+in the room is changed to "disconnected", but they are still listed
+among the room's users, and their name can't be reused.  Once all
+users are disconnected, the room is destroyed; afterward, a new room
+with the same name will be created if a new user requests that room
+name.
+
 ## Structure of messages
 
 All messages are JSON objects encoded as strings. These objects will
@@ -32,6 +70,8 @@ may be present depending on the type of the message.
 A "join" message is sent by the client when they sign in to the
 server. Its fields are:
 
+* room: the room the user wishes to join. This must be a string 1-20
+  characters long, containing only alphanumeric characters.
 * name: the name the user wishes to be known by. This must be a string
   1-8 characters long, containing only alphanumeric characters.
 * pubkey: an RSA modulus, encoded as a string of base 64 digits. This
@@ -42,37 +82,45 @@ server. Its fields are:
 
 Sent by the client when they wish to leave the server; has no fields
 other than "type". Upon receiving this message, the server will close
-the client's websocket and remove them from the list of users.
+the client's websocket and mark them as disconnected in their room. If
+every client in the room is disconnected, the room is destroyed.
 
 ## Server-to-client message types
 
 ### welcome
 
 Acknowledges a "join" message, and indicates that the client has been
-added to the list of users with the requested name.
+added to the list of users in the requested room with the requested
+name.
 
 Fields:
 
+* room: the requested room
 * name: the requested name
 
 ### unavailable
 
 Sent in response to a "join" message, indicating that the requested
-username is unavailable.
+username is unavailable in the requested room.
 
 Fields:
 
+* room: the requested room
 * name: the requested name
 
 ### users
 
-Provides a list of users currently signed in. Sent to all clients
-whenever a new client joins.
+Provides a list of users currently signed in to the client's
+room. Sent to all clients in a room whenever a new client joins the
+room. A "users" message must only be sent to a client after the client
+has been sent a "welcome" message confirming their name and room.
 
 Fields:
 
-* users: a JSON object with keys for each username, and the users'
-  public keys as values.
+* users: a JSON object with keys for each username. Values are JSON
+  objects, with a key "pubkey" whose value is a base64 encoded RSA
+  modulus; and a key "connected", whose value is a boolean indicating
+  whether the user is currently connected to the server.
 
 ### error
 
