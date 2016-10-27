@@ -2,7 +2,11 @@ var states = {INITIAL: "initial", INITIATED: "initiated",
               THEYINITIATED: "theyinitiated",
               RESPONDED: "responded", DECRYPTED: "decrypted",
               REVEALED: "revealed", CONFIRMED: "confirmed",
-              CHEAT: "cheat"};
+              CHEAT: "cheat", DISCONNECTED: "disconnected"};
+// DISCONNECTED indicates that neither party has learned anything yet;
+// if a partner disconnects after learning something, the state will
+// be either CONFIRMED or CHEAT.
+
 var likes = {UNKNOWN: "unknown", DONTLIKE: 0, LIKE: 1};
 var msgcolors = {INFO: "", SUCCESS: "green", ERROR: "red"};
 var rsa = forge.pki.rsa;
@@ -19,6 +23,7 @@ var S_LEN = 32; // bytes
 // TODO: use wss so NSA can't spy on the social graph
 var socket = new WebSocket("ws://127.0.0.1:8000"); // for testing
 var users = new Map();
+var room = undefined; // we should always be able to get the room we request, as long as it's a valid string
 var name = undefined;
 var requestedName = undefined;
 var keypair = rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT});
@@ -33,23 +38,32 @@ function receiveServer_raw(event) {
 
 function receiveServer(data) {
     switch (data["type"]) {
-    // XXX deal with server sending us these messages at inappropriate times
+        // XXX deal with server sending us these messages at inappropriate times.
+        // In particular, don't let server send "users" before "welcome".
     case "welcome":
-        if (data["name"] === requestedName) {
+        if (data["name"] !== requestedName) {
+            console.log("server tried to assign us unrequested name: " + data["name"]);
+        } else if (data["room"] !== room) {
+            console.log("server tried to assign us unrequested room: " + data["room"]);
+        } else {
             name = data["name"];
-            newUser(name, keypair.publicKey.n);
+            newUser(name, keypair.publicKey.n, true);
             hide("signin");
+            showMessage("room", room, msgcolors.INFO);
             showMessage("name", "Welcome, " + name + "!", msgcolors.INFO);
             show("users");
-        } else {
-            console.log("server tried to assign us unrequested name: " + data["name"]);
         }
         break;
     case "unavailable":
-        if (data["name"] === requestedName) {
-            showMessage("name", "The username " + data["name"] + " is unavailable. Please choose a different name.", msgcolors.ERROR);
-        } else {
+        if (data["name"] !== requestedName) {
             console.log("server rejected unrequested name: " + data["name"]);
+        } else if (data["room"] !== room) {
+            console.log("server rejected name in unrequested room: " + data["room"]);
+        } else {
+            showMessage("name",
+                        "The username " + data["name"] + " is unavailable in room " +
+                        data["room"] + ". " + "Please choose a different name.",
+                        msgcolors.ERROR);
         }
         break;
     case "users":
@@ -72,16 +86,29 @@ function receiveServer(data) {
 }
 
 function signIn() {
+    var ok = true;
+    room = document.forms["signin"]["room"].value;
     requestedName = document.forms["signin"]["name"].value;
-    if (!usernameOK(requestedName)) {
-        showMessage("name", "Name must be 1-8 alphanumeric characters", msgcolors.ERROR);
-        return;
+    if (!roomOK(room)) {
+        showMessage("room", "Room must be 1-20 alphanumeric characters (no spaces)", msgcolors.ERROR);
+        ok = false;
+    } else {
+        hide("room");
     }
-    join();
+    if (!usernameOK(requestedName)) {
+        showMessage("name", "Name must be 1-8 alphanumeric characters (no spaces)", msgcolors.ERROR);
+        ok = false;
+    } else {
+        hide("name");
+    }
+
+    if (ok) {
+        join();
+    }
 }
 
 function join() {
-    sendServer({"type": "join", "name": requestedName,
+    sendServer({"type": "join", "room": room, "name": requestedName,
                 "pubkey": e64(bigNumToBytes(keypair.publicKey.n))});
 }
 
@@ -89,11 +116,31 @@ function usernameOK(username) {
     return /^[a-zA-Z0-9]{1,8}$/.test(username);
 }
 
+function roomOK(roomname) {
+    return /^[a-zA-Z0-9]{1,20}$/.test(roomname);
+}
+
 function updateUsers(users, newUsernames) {
     for (var username in newUsernames) {
         if (usernameOK(username)) {
-            if (!users.has(username) && username !== name) { // don't let server tell us our key
-                newUser(username, bytesToBigNum(d64(newUsernames[username])));
+            var userPubkey = bytesToBigNum(d64(newUsernames[username]["pubkey"]));
+            if (username === name) { // we add ourself separately so the server can't lie to us about ourself
+                if (!keypair.publicKey.n.equals(userPubkey)) {
+                    console.log("Server tried to give us incorrect public key!");
+                }
+                if (!newUsernames[username]["connected"]) {
+                    console.log("Server said we weren't connected!");
+                }
+            } else if (users.has(username)) {
+                var data = users.get(username);
+                if (!data["pubkey"].equals(userPubkey)) {
+                    console.log("Server tried to change a user's public key!");
+                }
+                if (data["connected"] && !newUsernames[username]["connected"]) {
+                    disconnectUser(username);
+                }
+            } else {
+                newUser(username, userPubkey, newUsernames[username]["connected"]);
             }
         }
         else {
@@ -101,19 +148,18 @@ function updateUsers(users, newUsernames) {
         }
     }
 
-    // XXX get rid of this bit once we have rooms
-    [...users].forEach(function([username, data]) {
+    [...users].forEach(function(value) {
+        var username = value[0];
         if (!(username in newUsernames) && username !== name) {
-            users.delete(username);
+            console.log("server tried to remove username");
         }
     });
 
     // update verification phrase
-    // XXX include room name, user connection status
-    var userKeys = [...users].map(function(currentValue, index, array) {
+    var roomData = [...users].map(function(currentValue, index, array) {
         return [currentValue[0], e64(bigNumToBytes(currentValue[1]["pubkey"]))];
     });
-    userKeys.sort(function(a, b) {
+    roomData.sort(function(a, b) {
         if (a[0] > b[0]) {
             return 1;
         }
@@ -122,24 +168,29 @@ function updateUsers(users, newUsernames) {
         }
         return 0;
     });
-    showMessage("phrase", hashPhrase(JSON.stringify(userKeys)), msgcolors.INFO);
+    roomData.unshift(room);
+    console.log(roomData);
+    showMessage("phrase", hashPhrase(JSON.stringify(roomData)), msgcolors.INFO);
 }
 
-function newUser(username, pubkey) {
+function newUser(username, pubkey, isConnected) {
     users.set(username,
               {"pubkey": pubkey,
-               "state": states.INITIAL,
+               "connected": isConnected,
+               "state": isConnected ? states.INITIAL : states.DISCONNECTED,
                "like": likes.UNKNOWN,
                "likemutual": likes.UNKNOWN});
-    addUserRow(username);
+    addUserRow(username, isConnected);
+    displayResult(username);
 }
 
 function sendSelections() {
-    for (var [username, data] of users) {
-        if (username === name) {
-            continue;
+    [...users].forEach(function(value) {
+        var username = value[0];
+        var data = value[1];
+        if (username === name || !data["connected"]) {
+            return;
         }
-        // XXX don't send for disconnected users
         var checkbox = document.getElementById("button_" + username);
         if (data["state"] === states.INITIAL ||
             data["state"] === states.THEYINITIATED) {
@@ -148,7 +199,7 @@ function sendSelections() {
             sendSelection(username);
         }
         checkbox.disabled = true;
-    }
+    });
 }
 
 function sendSelection(username) {
@@ -338,6 +389,37 @@ function verify(username) {
     data["state"] = states.CONFIRMED;
 }
 
+function disconnectUser(username) {
+    var data = users.get(username);
+
+    data["connected"] = false;
+    markUserRowDisconnected(username);
+
+    switch (data["state"]) {
+    case states.DECRYPTED:
+        console.log("user disconnected without sharing answer!");
+        data["state"] = states.CHEAT;
+        break;
+    case states.REVEALED:
+        console.log("user disconnected without sharing x");
+        if (data["likemutual"] === likes.LIKE) {
+            data["state"] = states.CONFIRMED; // no further verification is actually needed
+        } else {
+            data["state"] = states.CHEAT;
+        }
+        break;
+    case states.CHEAT:
+    case states.CONFIRMED:
+        break;
+    default:
+        console.log("user disconnected");
+        data["state"] = states.DISCONNECTED;
+        break;
+    }
+
+    displayResult(username);
+}
+
 function sendServer(x) {
     socket.send(JSON.stringify(x));
 }
@@ -475,6 +557,9 @@ function displayResult(username) {
         result = "CHEATING DETECTED";
         msgcolor = msgcolors.ERROR;
         break;
+    case states.DISCONNECTED:
+        result = "Disconnected";
+        break;
     }
 
     showMessage("result_" + username, result, msgcolor);
@@ -498,7 +583,7 @@ function hide(id) {
     document.getElementById(id).style.display = "none";
 }
 
-function addUserRow(username) {
+function addUserRow(username, isConnected) {
     var row = document.createElement("tr");
     var nameCell = document.createElement("td");
     var dtfCell = document.createElement("td");
@@ -525,11 +610,22 @@ function addUserRow(username) {
         checkbox.name = username;
         checkbox.id = "button_" + username;
         nameLabel.htmlFor = checkbox.id;
+        nameLabel.id = "label_" + username;
 
         nameLabel.textContent = username;
+
+        if (!isConnected) {
+            nameLabel.style.color = "gray";
+            checkbox.disabled = true;
+        }
     }
 
     document.getElementById("userlist").appendChild(row);
+}
+
+function markUserRowDisconnected(username) {
+    document.getElementById("label_" + username).style.color = "gray";
+    document.getElementById("button_" + username).disabled = true;
 }
 
 
