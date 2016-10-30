@@ -71,6 +71,13 @@ Next, write a simple config file for NGINX:
 
 All we need is the following:
 
+    user http;
+    worker_processes auto;
+    
+    events {
+        worker_connections 1024;
+    }
+    
     http {
         server {
             server_name kataomoi.mit.edu;
