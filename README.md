@@ -106,6 +106,8 @@ NGINX to use them, just run
 
     $ certbot --nginx
 
+When asked whether to require HTTPS, select the "Secure" option.
+
 Once that's done, you're ready to start NGINX:
 
     $ systemctl enable nginx.service
