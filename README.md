@@ -46,18 +46,18 @@ using Let's Encrypt certificates.
 
 First, we install NGINX, Haskell tools, and Let's Encrypt tools:
 
-   $ sudo pacman -S nginx-mainline ghc cabal certbot certbot-nginx
+    $ sudo pacman -S nginx-mainline ghc cabal certbot certbot-nginx
 
 Next, all of the cabal packages we'll need for the server:
 
-   $ cabal update
-   $ cabal install json lens text websockets
+    $ cabal update
+    $ cabal install json lens text websockets
 
 Now, clone this repo, and tweak the client JS to connect to your
 server:
 
-   $ git clone https://github.com/ichung/kataomoi
-   $ vi kataomoi/client/client.js
+    $ git clone https://github.com/ichung/kataomoi
+    $ vi kataomoi/client/client.js
 
 Find the line near the top that says
 
