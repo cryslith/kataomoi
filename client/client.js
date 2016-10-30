@@ -20,8 +20,8 @@ var SENPAI_PUBLIC_EXPONENT = 0x10001;
 var seBI = new forge.jsbn.BigInteger("" + SENPAI_PUBLIC_EXPONENT, 10);
 var S_LEN = 32; // bytes
 
-// TODO: use wss so NSA can't spy on the social graph
-var socket = new WebSocket("ws://127.0.0.1:8000"); // for testing
+var socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
+
 var users = new Map();
 var room = undefined; // we should always be able to get the room we request, as long as it's a valid string
 var name = undefined;
