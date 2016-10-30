@@ -28,7 +28,7 @@ getKey = snd
 
 type ServerState = Map.Map Room RoomData
 
-port = 8989
+port = 9001
 
 newServerState :: ServerState
 newServerState = Map.empty
@@ -223,4 +223,4 @@ main :: IO ()
 main = do
   mstate <- newMVar newServerState
   putStrLn $ "Starting server on port " ++ show port ++ "..."
-  WS.runServer "0.0.0.0" port $ server mstate
+  WS.runServer "127.0.0.1" port $ server mstate
