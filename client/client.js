@@ -30,6 +30,7 @@ var keypair = rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT});
 
 
 socket.onmessage = receiveServer_raw;
+socket.onclose = socketClosed;
 
 function receiveServer_raw(event) {
     console.log(event.data);
@@ -83,6 +84,15 @@ function receiveServer(data) {
         console.log("invalid message type");
         return;
     }
+}
+
+function socketClosed(event) {
+    showMessage("fatal", "Lost connection with server!", msgcolors.ERROR);
+    [...users].forEach(function(value) {
+        if (value[0] !== name) {
+            disconnectUser(value[0]);
+        }
+    });
 }
 
 function signIn() {
@@ -389,6 +399,7 @@ function verify(username) {
     data["state"] = states.CONFIRMED;
 }
 
+// must not be called on ourself
 function disconnectUser(username) {
     var data = users.get(username);
 
@@ -623,6 +634,7 @@ function addUserRow(username, isConnected) {
     document.getElementById("userlist").appendChild(row);
 }
 
+// Must not be called on ourself
 function markUserRowDisconnected(username) {
     document.getElementById("label_" + username).style.color = "gray";
     document.getElementById("button_" + username).disabled = true;
