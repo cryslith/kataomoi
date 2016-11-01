@@ -147,6 +147,11 @@ sendError conn s m =
                       , ("message", J.showJSON m)
                       ]
 
+sendKeepalive :: WS.Connection -> IO ()
+sendKeepalive conn =
+  send conn $
+       J.toJSObject [ ("type", J.showJSON "keepalive") ]
+
 server :: MVar ServerState -> WS.ServerApp
 server mstate pending = do
   conn <- WS.acceptRequest pending
@@ -186,6 +191,7 @@ server mstate pending = do
                               else sendUnavailable conn room name
                          )
                     else sendError conn "invalid username or room" jsonString
+          else if t == "keepalive" then Just $ sendKeepalive conn
           else if t == "client" then
             do
               sender <- Map.lookup "sender" jsonData
