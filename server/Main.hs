@@ -6,6 +6,9 @@ import qualified Control.Exception as C
 import Control.Monad (forever, when)
 import Control.Concurrent (MVar, newMVar, modifyMVar_, readMVar)
 import Data.IORef
+import Data.Traversable (traverse, Traversable)
+import Data.Foldable (Foldable)
+import Control.Applicative ((*>), pure, Applicative)
 import Data.Maybe (isJust, fromMaybe)
 import Control.Lens.At (at)
 
@@ -47,13 +50,17 @@ usersJSON =
                       ]
             )
 
+traverse__ :: (Traversable t, Foldable t, Applicative f) => (a -> f b) -> t a -> f ()
+traverse__ r l =
+  traverse r l *> pure ()
+
 alterRoom :: MVar ServerState -> Room -> RoomAlterer -> (Bool -> IO ()) -> IO ()
 alterRoom mstate room f react =
     do
       modifyMVar_ mstate (at room $ reactAndSend . f)
     where reactAndSend (b, mrd) = do
             react b
-            when b $ mapM_ sendAllUsers mrd
+            when b $ traverse__ sendAllUsers mrd
             return mrd
 
 -- If the requested name is available, adds a user to a room, creating
@@ -80,7 +87,7 @@ markUserDisconnected u mrd =
        Just rd ->
            let rd' = Map.adjust (\(mc, k) -> (Nothing, k)) u rd
            in
-             if null $ Map.filter (\(mc, k) -> isJust mc) rd'
+             if Map.null $ Map.filter (\(mc, k) -> isJust mc) rd'
              then Nothing
              else Just rd'
     )
