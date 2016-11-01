@@ -79,6 +79,8 @@ All we need is the following:
     }
     
     http {
+        include mime.types;
+    
         server {
             server_name kataomoi.mit.edu;
     
