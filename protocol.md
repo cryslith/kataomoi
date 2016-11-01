@@ -84,13 +84,6 @@ Sent by the client periodically to keep the connection alive; has no
 fields other than "type".  Upon receiving this message, the server will
 send a keepalive message in reply.
 
-### quit
-
-Sent by the client when they wish to leave the server; has no fields
-other than "type". Upon receiving this message, the server will close
-the client's websocket and mark them as disconnected in their room. If
-every client in the room is disconnected, the room is destroyed.
-
 ## Server-to-client message types
 
 ### welcome
