@@ -34,6 +34,7 @@ window.onload = function() {
     socket.onmessage = receiveServer_raw;
     socket.onclose = socketClosed;
     keepalive_intervalID = setInterval(sendKeepalive, 10000);
+    document.forms["signin"]["room"].value = location.hash.substring(1);
     rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT, workers: -1},
                         function(e, kp) {
                             hide("keygen");
@@ -62,11 +63,13 @@ function receiveServer(data) {
         } else if (data["room"] !== room) {
             console.log("server tried to assign us unrequested room: " + data["room"]);
         } else {
+            location.hash = room;
             name = data["name"];
             newUser(name, keypair.publicKey.n, true);
             hide("signin");
             showMessage("room", room, msgcolors.INFO);
             showMessage("name", "Signed in as " + name, msgcolors.INFO);
+            showInvite();
             show("users");
         }
         break;
@@ -662,6 +665,17 @@ function markUserRowDisconnected(username) {
 
 function disable(id) {
     document.getElementById(id).disabled = true;
+}
+
+function showInvite() {
+    if (location.protocol == "file:") {
+        return;
+    }
+
+    var link = document.getElementById("inviteLink");
+    link.href = location.href;
+    link.textContent = location.href;
+    show("invite");
 }
 
 
