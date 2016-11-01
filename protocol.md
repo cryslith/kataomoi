@@ -78,6 +78,12 @@ server. Its fields are:
   will be the user's public key for wrapping all client-to-client
   messages.
 
+## keepalive
+
+Sent by the client periodically to keep the connection alive; has no
+fields other than "type".  Upon receiving this message, the server will
+send a keepalive message in reply.
+
 ### quit
 
 Sent by the client when they wish to leave the server; has no fields
@@ -97,6 +103,11 @@ Fields:
 
 * room: the requested room
 * name: the requested name
+
+## keepalive
+
+Sent by the server in reply to a keepalive message from the client; has
+no fields other than "type".
 
 ### unavailable
 
