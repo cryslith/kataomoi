@@ -158,7 +158,7 @@ server mstate pending = do
   chan <- atomically $ newTChan
   roomRef <- newIORef Nothing
   nameRef <- newIORef Nothing
-  forkIO $ flip C.finally (disconnect conn roomRef nameRef) $ forever $ sendFromChan conn chan
+  forkIO $ forever $ sendFromChan conn chan
   flip C.finally (disconnect conn roomRef nameRef) $ forever $ do
     text <- WS.receiveData conn
     putStrLn (T.unpack text)
@@ -208,7 +208,6 @@ server mstate pending = do
                         x <- forwardMessage s r recipient jsonString
                         if x then return () else sendError conn "no such recipient" jsonString
                   _ -> sendError conn "not joined yet" jsonString
-          else if t == "quit" then Just $ disconnect conn roomRef nameRef
           else Nothing
     case y of
       Nothing -> do
@@ -217,7 +216,8 @@ server mstate pending = do
       Just x -> x
   where
     disconnect conn roomRef nameRef = do
-      WS.sendClose conn (T.pack "quit")
+      -- We don't need to close the connection, because we should only
+      -- get here if the client closed the connection already
       room <- readIORef roomRef
       name <- readIORef nameRef
       case (room, name) of
