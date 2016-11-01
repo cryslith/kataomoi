@@ -26,21 +26,25 @@ var name = undefined;
 var requestedName = undefined;
 var keypair = undefined;
 
-var socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
-socket.onmessage = receiveServer_raw;
-socket.onclose = socketClosed;
-var keepalive_intervalID = setInterval(sendKeepalive, 10000);
+var socket = undefined;
+var keepalive_intervalID = undefined;
 
-rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT, workers: -1},
-                    function(e, kp) {
-                        hide("keygen");
-                        if (e) {
-                            showMessage("error", "Key generation error", msgcolors.ERROR);
-                        } else {
-                            keypair = kp;
-                            show("signin");
-                        }
-                    });
+window.onload = function() {
+    socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
+    socket.onmessage = receiveServer_raw;
+    socket.onclose = socketClosed;
+    keepalive_intervalID = setInterval(sendKeepalive, 10000);
+    rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT, workers: -1},
+                        function(e, kp) {
+                            hide("keygen");
+                            if (e) {
+                                showMessage("error", "Key generation error", msgcolors.ERROR);
+                            } else {
+                                keypair = kp;
+                                show("signin");
+                            }
+                        });
+};
 
 
 function receiveServer_raw(event) {
