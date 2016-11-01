@@ -35,7 +35,7 @@ rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT, workers: -1},
                     function(e, kp) {
                         hide("keygen");
                         if (e) {
-                            showMessage("fatal", "Key generation error", msgcolors.ERROR);
+                            showMessage("error", "Key generation error", msgcolors.ERROR);
                         } else {
                             keypair = kp;
                             show("signin");
@@ -62,7 +62,7 @@ function receiveServer(data) {
             newUser(name, keypair.publicKey.n, true);
             hide("signin");
             showMessage("room", room, msgcolors.INFO);
-            showMessage("name", "Welcome, " + name + "!", msgcolors.INFO);
+            showMessage("name", "Signed in as " + name, msgcolors.INFO);
             show("users");
         }
         break;
@@ -72,7 +72,7 @@ function receiveServer(data) {
         } else if (data["room"] !== room) {
             console.log("server rejected name in unrequested room: " + data["room"]);
         } else {
-            showMessage("name",
+            showMessage("error",
                         "The username " + data["name"] + " is unavailable in room " +
                         data["room"] + ". " + "Please choose a different name.",
                         msgcolors.ERROR);
@@ -100,7 +100,10 @@ function receiveServer(data) {
 }
 
 function socketClosed(event) {
-    showMessage("fatal", "Lost connection with server!", msgcolors.ERROR);
+    showMessage("error", "Lost connection with server!", msgcolors.ERROR);
+    disable("button_signin");
+    disable("button_selections");
+    clearInterval(keepalive_intervalID);
     [...users].forEach(function(value) {
         if (value[0] !== name) {
             disconnectUser(value[0]);
@@ -110,23 +113,23 @@ function socketClosed(event) {
 
 function signIn() {
     var ok = true;
+    var errmsg = "";
     room = document.forms["signin"]["room"].value;
     requestedName = document.forms["signin"]["name"].value;
     if (!roomOK(room)) {
-        showMessage("room", "Room must be 1-20 alphanumeric characters (no spaces)", msgcolors.ERROR);
+        errmsg += "Room must be 1-20 alphanumeric characters (no spaces). ";
         ok = false;
-    } else {
-        hide("room");
     }
     if (!usernameOK(requestedName)) {
-        showMessage("name", "Name must be 1-8 alphanumeric characters (no spaces)", msgcolors.ERROR);
+        errmsg += "Name must be 1-8 alphanumeric characters (no spaces). ";
         ok = false;
-    } else {
-        hide("name");
     }
 
     if (ok) {
+        hide("error");
         join();
+    } else {
+        showMessage("error", errmsg, msgcolors.ERROR);
     }
 }
 
@@ -650,7 +653,11 @@ function addUserRow(username, isConnected) {
 // Must not be called on ourself
 function markUserRowDisconnected(username) {
     document.getElementById("label_" + username).style.color = "gray";
-    document.getElementById("button_" + username).disabled = true;
+    disable("button_" + username);
+}
+
+function disable(id) {
+    document.getElementById(id).disabled = true;
 }
 
 
