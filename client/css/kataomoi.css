@@ -1,0 +1,31 @@
+.container {
+    margin-top: 6rem;
+}
+
+th {
+    padding-top: 0px;
+}
+
+td.user, th.user {
+    width: 12rem;
+}
+
+td.dtf, th.dtf {
+    width: 6rem;
+}
+
+#keygen, #room, #name {
+    text-align: center;
+}
+
+input[disabled].button-primary {
+  color: #FFF;
+  background-color: #ccc;
+  border-color: #ccc;
+}
+
+input[disabled].button-primary:hover, input[disabled].button-primary:focus {
+  color: #FFF;
+  background-color: #ccc;
+  border-color: #ccc;
+}

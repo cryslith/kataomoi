@@ -1,42 +1,66 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
     <head>
-        <meta http-equiv="content-type" content="text/html; charset=UTF-8"></meta>
+        <meta charset="utf-8">
         <title>kataomoi</title>
+        <meta name="description" content="Cryptographic dating webapp">
+        <meta name="author" content="Samuel Dukhovni and Istvan Chung">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="stylesheet" href="css/normalize.css">
+        <link rel="stylesheet" href="css/skeleton.css">
+        <link rel="stylesheet" href="css/kataomoi.css">
+
         <script type="text/javascript" src="forge.bundle.js"></script>
         <script type="text/javascript" src="client.js"></script>
-        <link rel="stylesheet" href="kataomoi.css"/>
     </head>
     <body>
-        <h2 id="fatal" style="display:none;"></h2>
-        <div id="keygen">
-          <h3>Generating cryptographic keys...</h3>
-          <img src="loading.gif"/>
-        </div>
-        <div id="signin" style="display:none;">
-            <form name="signin" onsubmit="signIn()" action="javascript:void(0);">
-                <table>
-                    <tr><td>Room: </td><td><input type="text" name="room"/></td></tr>
-                    <tr><td>Name: </td><td><input type="text" name="name"/></td></tr>
-                </table>
-                <input type="submit" value="Sign In"/>
-            </form>
-        </div>
-        <h2 id="room" style="display:none;"></h2>
-        <h2 id="name" style="display:none;"></h2>
-        <div id="users" style="display:none;">
-            <h2>Users Online:</h2>
-            <form name="selections" onsubmit="sendSelections()" action="javascript:void(0);">
-                <table id="userlist">
-                    <tr style="font-weight: bold">
-                        <td class="user">User</td>
-                        <td class="dtf">DTF?</td>
-                        <td class="result">Result</td>
-                    </tr>
-                </table>
-                <input type="submit" value="Send choices">
-            </form>
-            <h3>Verification Phrase (make sure this is the same for everyone; if it isn't, someone may be eavesdropping or tampering with your connection):</h3>
-            <div id="phrase"></div>
+        <div class="container">
+            <p id="error" style="display:none;"></p>
+            <div id="keygen">
+                <p>Generating cryptographic keys...</p>
+                <img src="loading.gif"/>
+            </div>
+            <div id="signin" style="display:none;">
+                <form name="signin" onsubmit="signIn()" action="javascript:void(0);">
+                    <div class="row">
+                        <div class="six columns">
+                            <label for="roomInput">Room</label>
+                            <input type="text" class="u-full-width" id="roomInput" placeholder="AwesomePeople" name="room"/>
+                        </div>
+                        <div class="six columns">
+                            <label for="nameInput">Name</label>
+                            <input type="text" class="u-full-width" id="nameInput" placeholder="AlyssaH" name="name"/>
+                        </div>
+                    </div>
+                    <input type="submit" class="button-primary" id="button_signin" value="Sign In"/>
+                </form>
+            </div>
+            <div class="row">
+                <h3 class="six columns" id="room" style="display:none;"></h3>
+                <h3 class="six columns" id="name" style="display:none;"></h3>
+            </div>
+            <div id="users" style="display:none;">
+                <h5>Users Online</h5>
+                <form name="selections" onsubmit="sendSelections()" action="javascript:void(0);">
+                    <table class="u-full-width">
+                        <thead>
+                            <tr>
+                                <th class="user">User</th>
+                                <th class="dtf">DTF?</th>
+                                <th class="result">Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userlist">
+                        </tbody>
+                    </table>
+                    <input type="submit" class="button-primary" id="button_selections" value="Send choices">
+                </form>
+                <h5>Verification Phrase</h5>
+                <h6>If this phrase isn't the same for every user in this room, someone may be eavesdropping or tampering with your connection:</h6>
+                <p id="phrase"></p>
+            </div>
         </div>
     </body>
 </html>
