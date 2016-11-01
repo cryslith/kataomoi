@@ -5,9 +5,9 @@ import qualified Data.Text as T
 import qualified Control.Exception as C
 import qualified Data.Foldable as F (mapM_)
 import Control.Monad (forever, when)
-import Control.Concurrent (MVar, newMVar, modifyMVarMasked_, readMVar)
+import Control.Concurrent (MVar, newMVar, modifyMVarMasked_, readMVar, forkIO)
 import Control.Monad.STM (atomically)
-import Control.Concurrent.STM.TChan (TChan, newTChan, tryReadTChan, writeTChan)
+import Control.Concurrent.STM.TChan (TChan, newTChan, readTChan, writeTChan)
 import Data.IORef
 import Data.Maybe (isJust, fromMaybe)
 import Control.Lens.At (at)
@@ -94,10 +94,10 @@ send conn = WS.sendTextData conn . T.pack
 sendJSON :: J.JSON a => WS.Connection -> a -> IO ()
 sendJSON conn = (send conn) . J.encode
 
-trySendFromChan :: WS.Connection -> TChan String -> IO ()
-trySendFromChan conn chan = do
-  ms <- atomically $ tryReadTChan chan
-  mapM_ (send conn) ms
+sendFromChan :: WS.Connection -> TChan String -> IO ()
+sendFromChan conn chan = do
+  s <- atomically $ readTChan chan
+  send conn s
 
 delegateSend :: TChan String -> String -> IO ()
 delegateSend c s = atomically $ writeTChan c s
@@ -158,8 +158,8 @@ server mstate pending = do
   chan <- atomically $ newTChan
   roomRef <- newIORef Nothing
   nameRef <- newIORef Nothing
+  forkIO $ flip C.finally (disconnect conn roomRef nameRef) $ forever $ sendFromChan conn chan
   flip C.finally (disconnect conn roomRef nameRef) $ forever $ do
-    trySendFromChan conn chan
     text <- WS.receiveData conn
     putStrLn (T.unpack text)
     let jsonString = T.unpack text
