@@ -20,8 +20,7 @@ var SENPAI_PUBLIC_EXPONENT = 0x10001;
 var seBI = new forge.jsbn.BigInteger("" + SENPAI_PUBLIC_EXPONENT, 10);
 var S_LEN = 32; // bytes
 
-//var socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
-var socket = new WebSocket("ws://localhost:9001");
+var socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
 var keepalive_intervalID = setInterval(sendKeepalive, 10000);
 
 var users = new Map();
