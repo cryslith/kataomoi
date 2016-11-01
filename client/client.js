@@ -20,18 +20,28 @@ var SENPAI_PUBLIC_EXPONENT = 0x10001;
 var seBI = new forge.jsbn.BigInteger("" + SENPAI_PUBLIC_EXPONENT, 10);
 var S_LEN = 32; // bytes
 
-var socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
-var keepalive_intervalID = setInterval(sendKeepalive, 10000);
-
 var users = new Map();
 var room = undefined; // we should always be able to get the room we request, as long as it's a valid string
 var name = undefined;
 var requestedName = undefined;
-var keypair = rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT});
+var keypair = undefined;
 
-
+var socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
 socket.onmessage = receiveServer_raw;
 socket.onclose = socketClosed;
+var keepalive_intervalID = setInterval(sendKeepalive, 10000);
+
+rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT, workers: -1},
+                    function(e, kp) {
+                        hide("keygen");
+                        if (e) {
+                            showMessage("fatal", "Key generation error", msgcolors.ERROR);
+                        } else {
+                            keypair = kp;
+                            show("signin");
+                        }
+                    });
+
 
 function receiveServer_raw(event) {
     console.log(event.data);
