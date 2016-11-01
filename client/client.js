@@ -21,6 +21,7 @@ var seBI = new forge.jsbn.BigInteger("" + SENPAI_PUBLIC_EXPONENT, 10);
 var S_LEN = 32; // bytes
 
 var socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
+var keepalive_intervalID = setInterval(sendKeepalive, 10000);
 
 var users = new Map();
 var room = undefined; // we should always be able to get the room we request, as long as it's a valid string
@@ -79,6 +80,8 @@ function receiveServer(data) {
         break;
     case "error":
         console.log("server error: " + data["error"]);
+        break;
+    case "keepalive":
         break;
     default:
         console.log("invalid message type");
@@ -695,6 +698,10 @@ function decodePayload(data) {
     var plaintext = decipher.output.bytes();
     console.log(plaintext);
     return JSON.parse(plaintext);
+}
+
+function sendKeepalive() {
+    sendServer({"type": "keepalive"});
 }
 
 function hashPhrase(data) {

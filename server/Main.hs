@@ -3,6 +3,7 @@ import qualified Text.JSON as J
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import qualified Control.Exception as C
+import qualified Data.Foldable as F (mapM_)
 import Control.Monad (forever, when)
 import Control.Concurrent (MVar, newMVar, modifyMVarMasked_, readMVar)
 import Control.Monad.STM (atomically)
@@ -55,7 +56,7 @@ alterRoom mstate room f react =
       modifyMVarMasked_ mstate (at room $ reactAndSend . f)
     where reactAndSend (b, mrd) = do
             react b
-            when b $ mapM_ delegateSendAllUsers mrd
+            when b $ F.mapM_ delegateSendAllUsers mrd
             return mrd
 
 -- If the requested name is available, adds a user to a room, creating
@@ -82,7 +83,7 @@ markUserDisconnected u mrd =
        Just rd ->
            let rd' = Map.adjust (\(mc, k) -> (Nothing, k)) u rd
            in
-             if null $ Map.filter (\(mc, k) -> isJust mc) rd'
+             if Map.null $ Map.filter (\(mc, k) -> isJust mc) rd'
              then Nothing
              else Just rd'
     )
@@ -96,7 +97,7 @@ sendJSON conn = (send conn) . J.encode
 trySendFromChan :: WS.Connection -> TChan String -> IO ()
 trySendFromChan conn chan = do
   ms <- atomically $ tryReadTChan chan
-  mapM_ (send conn) ms
+  F.mapM_ (send conn) ms
 
 delegateSend :: TChan String -> String -> IO ()
 delegateSend c s = atomically $ writeTChan c s
@@ -109,10 +110,10 @@ delegateSendUsers chan rd = delegateSend chan $ J.encode $
 
 delegateSendAllUsers :: RoomData -> IO ()
 delegateSendAllUsers rd =
-    mapM_ (\(mchan, _) ->
-               mapM_ (flip delegateSendUsers rd) mchan
-          )
-          rd
+    F.mapM_ (\(mchan, _) ->
+               F.mapM_ (flip delegateSendUsers rd) mchan
+            )
+            rd
 
 forwardMessage :: ServerState -> Room -> User -> String -> IO Bool
 forwardMessage state room user msg =
@@ -145,6 +146,11 @@ sendError conn s m =
                       , ("error", J.showJSON s)
                       , ("message", J.showJSON m)
                       ]
+
+sendKeepalive :: WS.Connection -> IO ()
+sendKeepalive conn =
+  sendJSON conn $
+       J.toJSObject [ ("type", J.showJSON "keepalive") ]
 
 server :: MVar ServerState -> WS.ServerApp
 server mstate pending = do
@@ -185,6 +191,7 @@ server mstate pending = do
                               else sendUnavailable conn room name
                          )
                     else sendError conn "invalid username or room" jsonString
+          else if t == "keepalive" then Just $ sendKeepalive conn
           else if t == "client" then
             do
               sender <- Map.lookup "sender" jsonData
