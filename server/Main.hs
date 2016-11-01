@@ -4,14 +4,16 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import qualified Control.Exception as C
 import Control.Monad (forever, when)
-import Control.Concurrent (MVar, newMVar, modifyMVar_, readMVar)
+import Control.Concurrent (MVar, newMVar, modifyMVarMasked_, readMVar)
+import Control.Monad.STM (atomically)
+import Control.Concurrent.STM.TChan (TChan, newTChan, tryReadTChan, writeTChan)
 import Data.IORef
 import Data.Maybe (isJust, fromMaybe)
 import Control.Lens.At (at)
 
 type User = String
 type PublicKey = String
-type UserData = (Maybe WS.Connection, PublicKey)
+type UserData = (Maybe (TChan String), PublicKey)
 
 type Room = String
 type RoomData = Map.Map User UserData
@@ -20,7 +22,7 @@ type RoomData = Map.Map User UserData
 -- or failure. In the case of failure, the room must remain unchanged.
 type RoomAlterer = Maybe RoomData -> (Bool, Maybe RoomData)
 
-getConn :: UserData -> Maybe WS.Connection
+getConn :: UserData -> Maybe (TChan String)
 getConn = fst
 
 getKey :: UserData -> PublicKey
@@ -37,23 +39,23 @@ usersJSON :: RoomData -> J.JSObject J.JSValue
 usersJSON =
     J.toJSObject .
     Map.toList .
-    Map.map (\(mconn, key) ->
+    Map.map (\(mchan, key) ->
                  J.JSObject $
                  J.toJSObject
                       [ ( "pubkey"
                         , J.showJSON key)
                       , ( "connected"
-                        , J.showJSON $ isJust mconn)
+                        , J.showJSON $ isJust mchan)
                       ]
             )
 
 alterRoom :: MVar ServerState -> Room -> RoomAlterer -> (Bool -> IO ()) -> IO ()
 alterRoom mstate room f react =
     do
-      modifyMVar_ mstate (at room $ reactAndSend . f)
+      modifyMVarMasked_ mstate (at room $ reactAndSend . f)
     where reactAndSend (b, mrd) = do
             react b
-            when b $ mapM_ sendAllUsers mrd
+            when b $ mapM_ delegateSendAllUsers mrd
             return mrd
 
 -- If the requested name is available, adds a user to a room, creating
@@ -85,36 +87,44 @@ markUserDisconnected u mrd =
              else Just rd'
     )
 
-send :: J.JSON a => WS.Connection -> a -> IO ()
-send conn = WS.sendTextData conn . T.pack . J.encode
+send :: WS.Connection -> String -> IO ()
+send conn = WS.sendTextData conn . T.pack
 
-sendUsers :: WS.Connection -> RoomData -> IO ()
-sendUsers conn rd = send conn $
+sendJSON :: J.JSON a => WS.Connection -> a -> IO ()
+sendJSON conn = (send conn) . J.encode
+
+trySendFromChan :: WS.Connection -> TChan String -> IO ()
+trySendFromChan conn chan = do
+  ms <- atomically $ tryReadTChan chan
+  mapM_ (send conn) ms
+
+delegateSend :: TChan String -> String -> IO ()
+delegateSend c s = atomically $ writeTChan c s
+
+delegateSendUsers :: TChan String -> RoomData -> IO ()
+delegateSendUsers chan rd = delegateSend chan $ J.encode $
   J.toJSObject [ ("type", J.showJSON "users")
                , ("users", J.JSObject $ usersJSON rd)
                ]
 
-sendAllUsers :: RoomData -> IO ()
-sendAllUsers rd =
-    Map.foldr
-           (\(mconn, _) m ->
-                case mconn of
-                  Just conn -> m >> sendUsers conn rd
-                  Nothing -> m)
-           (return ())
-           rd
+delegateSendAllUsers :: RoomData -> IO ()
+delegateSendAllUsers rd =
+    mapM_ (\(mchan, _) ->
+               mapM_ (flip delegateSendUsers rd) mchan
+          )
+          rd
 
 forwardMessage :: ServerState -> Room -> User -> String -> IO Bool
-forwardMessage s room user t =
-  case Map.lookup room s >>= Map.lookup user of
-    Just (Just conn, _) -> do
-      WS.sendTextData conn $ T.pack $ t
+forwardMessage state room user msg =
+  case Map.lookup room state >>= Map.lookup user of
+    Just (Just chan, _) -> do
+      delegateSend chan msg
       return True
     Nothing -> return False
 
 sendWelcome :: WS.Connection -> Room -> User -> IO ()
 sendWelcome conn r u =
-    send conn $
+    sendJSON conn $
          J.toJSObject [ ("type", J.showJSON "welcome")
                       , ("room", J.showJSON r)
                       , ("name", J.showJSON u)
@@ -122,7 +132,7 @@ sendWelcome conn r u =
 
 sendUnavailable :: WS.Connection -> Room -> User -> IO ()
 sendUnavailable conn r u =
-    send conn $
+    sendJSON conn $
          J.toJSObject [ ("type", J.showJSON "unavailable")
                       , ("room", J.showJSON r)
                       , ("name", J.showJSON u)
@@ -130,7 +140,7 @@ sendUnavailable conn r u =
 
 sendError :: WS.Connection -> String -> String -> IO ()
 sendError conn s m =
-    send conn $
+    sendJSON conn $
          J.toJSObject [ ("type", J.showJSON "error")
                       , ("error", J.showJSON s)
                       , ("message", J.showJSON m)
@@ -139,9 +149,11 @@ sendError conn s m =
 server :: MVar ServerState -> WS.ServerApp
 server mstate pending = do
   conn <- WS.acceptRequest pending
+  chan <- atomically $ newTChan
   roomRef <- newIORef Nothing
   nameRef <- newIORef Nothing
   flip C.finally (disconnect conn roomRef nameRef) $ forever $ do
+    trySendFromChan conn chan
     text <- WS.receiveData conn
     putStrLn (T.unpack text)
     let jsonString = T.unpack text
@@ -163,7 +175,7 @@ server mstate pending = do
                 else
                     if usernameOK name && roomOK room
                     then do
-                      alterRoom mstate room (addUser name (Just conn, pubkey))
+                      alterRoom mstate room (addUser name (Just chan, pubkey))
                          (\success ->
                               if success
                               then do
