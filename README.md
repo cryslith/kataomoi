@@ -61,7 +61,7 @@ server:
 
 Find the line near the top that says
 
-    var socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
+        socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
 
 and replace `kataomoi.mit.edu` with your domain name.
 
