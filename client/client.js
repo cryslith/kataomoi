@@ -591,6 +591,9 @@ function displayResult(username) {
     case states.INITIAL:
         result = "";
         break;
+    case states.GENERATING:
+        result = "Generating key...";
+        break;
     case states.INITIATED:
         result = "Waiting for response...";
         break;
