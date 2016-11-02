@@ -1,5 +1,5 @@
-var states = {INITIAL: "initial", INITIATED: "initiated",
-              THEYINITIATED: "theyinitiated",
+var states = {INITIAL: "initial", GENERATING: "generating",
+              INITIATED: "initiated", THEYINITIATED: "theyinitiated",
               RESPONDED: "responded", DECRYPTED: "decrypted",
               REVEALED: "revealed", CONFIRMED: "confirmed",
               CHEAT: "cheat", DISCONNECTED: "disconnected"};
@@ -239,7 +239,7 @@ function sendSelection(username) {
     var state = users.get(username)["state"];
     switch (state) {
     case states.INITIAL:
-        initiate(username);
+        generateSenpaiKey(username);
         break;
     case states.THEYINITIATED:
         respond(username);
@@ -252,6 +252,7 @@ function sendSelection(username) {
     displayResult(username);
 }
 
+
 function withFirstBit(bytes, b) {
     var buffer = forge.util.createBuffer(bytes, "raw");
     buffer.setAt(0, buffer.at(0) & 0xfe | b);
@@ -263,10 +264,30 @@ function getFirstBit(bytes) {
     return buffer.at(0) & 0x01;
 }
 
+
+function generateSenpaiKey(username) {
+    var data = users.get(username);
+    data["state"] = states.GENERATING;
+    rsa.generateKeyPair({bits: SENPAI_BITS, e: SENPAI_PUBLIC_EXPONENT, workers: -1},
+                        function(e, kp) {
+                            if (e) {
+                                console.log("error generating SENPAI key");
+                                return;
+                            }
+                            if (data["state"] === states.THEYINITIATED) {
+                                respond(username);
+                            } else if (data["state"] === states.DISCONNECTED) {
+                                // NOP
+                            } else {
+                                data["keypair"] = kp;
+                                initiate(username);
+                            }
+                        });
+}
+
 function initiate(username) {
     var data = users.get(username);
-    var key = rsa.generateKeyPair({bits: SENPAI_BITS, e: SENPAI_PUBLIC_EXPONENT});
-    data["keypair"] = key;
+    var key = data["keypair"];
     var s = forge.random.getBytesSync(S_LEN);
     var s_y1 = forge.random.getBytesSync(S_LEN);
     data["s"] = s;
@@ -471,6 +492,7 @@ function receiveClient(sender, message) {
     switch (message["type"]) {
     case "initiate":
         switch (data["state"]) {
+        case states.GENERATING:
         case states.INITIATED:
             // resolve race condition via usernames
             if (name < sender) {
@@ -482,7 +504,11 @@ function receiveClient(sender, message) {
             data["xe"] = bytesToBigNum(d64(message["xe"]));
             data["ye"] = bytesToBigNum(d64(message["ye"]));
             data["sh"] = d64(message["sh"]);
-            data["state"] = states.THEYINITIATED;
+            if (data["state"] === states.INITIATED) {
+                respond(username);
+            } else {
+                data["state"] = states.THEYINITIATED;
+            }
             break;
         default:
             console.log("wrong state for initiate");
