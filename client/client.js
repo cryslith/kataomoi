@@ -284,6 +284,7 @@ function generateSenpaiKey(username) {
                                 data["keypair"] = kp;
                                 initiate(username);
                             }
+                            displayResult(username);
                         });
 }
 
