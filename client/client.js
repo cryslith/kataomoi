@@ -30,6 +30,8 @@ var socket = undefined;
 var keepalive_intervalID = undefined;
 
 window.onload = function() {
+    enable("button_signin");
+    enable("button_selections");
     socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
     socket.onmessage = receiveServer_raw;
     socket.onclose = socketClosed;
@@ -694,6 +696,10 @@ function markUserRowDisconnected(username) {
 
 function disable(id) {
     document.getElementById(id).disabled = true;
+}
+
+function enable(id) {
+    document.getElementById(id).disabled = false;
 }
 
 function showInvite() {
