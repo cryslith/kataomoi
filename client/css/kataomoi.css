@@ -18,6 +18,10 @@ td.dtf, th.dtf {
     text-align: center;
 }
 
+#invite {
+    margin-bottom: 2rem;
+}
+
 input[disabled].button-primary {
   color: #FFF;
   background-color: #ccc;
