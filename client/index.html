@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <title>kataomoi</title>
-        <meta name="description" content="Cryptographic dating webapp">
+        <meta name="description" content="Cryptographic matchmaking webapp">
         <meta name="author" content="Samuel Dukhovni and Istvan Chung">
 
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,6 +17,7 @@
     </head>
     <body>
         <div class="container">
+            <h1 id="title">kataomoi</h1>
             <p id="error" style="display:none;"></p>
             <div id="keygen">
                 <p>Generating cryptographic keys...</p>
@@ -41,9 +42,9 @@
                 <h3 class="six columns" id="room" style="display:none;"></h3>
                 <h3 class="six columns" id="name" style="display:none;"></h3>
             </div>
-            <div id="invite" style="display:none;">
+            <p id="invite" style="display:none;">
                 To invite friends, send them this link: <a href="" id="inviteLink"></a>
-            </div>
+            </p>
             <div id="users" style="display:none;">
                 <h5>Users Online</h5>
                 <form name="selections" onsubmit="sendSelections()" action="javascript:void(0);">
@@ -63,6 +64,15 @@
                 <h5>Verification Phrase</h5>
                 <h6>If this phrase isn't the same for every user in this room, someone may be eavesdropping or tampering with your connection:</h6>
                 <p id="phrase"></p>
+            </div>
+            <div id="footer">
+                <div class="row">
+                    <a class="offset-by-three two columns" href="instructions.html">Instructions</a>
+                    <a class="two columns" href="about.html">About</a>
+                    <a class="two columns" href="https://github.com/ichung/kataomoi">Github</a>
+                </div>
+                <p>(c) 2016 Samuel Dukhovni and Istvan Chung. Code available under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>
+                <p>Contact: kataomoi at mit dot edu</p>
             </div>
         </div>
     </body>

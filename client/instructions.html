@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>kataomoi - Instructions</title>
+        <meta name="description" content="Cryptographic matchmaking webapp">
+        <meta name="author" content="Samuel Dukhovni and Istvan Chung">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="stylesheet" href="css/normalize.css">
+        <link rel="stylesheet" href="css/skeleton.css">
+        <link rel="stylesheet" href="css/kataomoi.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1 id="title"><a href="./">kataomoi</a></h1>
+            <h2>Instructions</h2>
+            <h3>Quick Start</h3>
+            <p>
+                kataomoi is a webapp for finding people you're interested
+                in who are interested in you, for any definition of
+                &ldquo;interested&rdquo;. To use it, follow these steps,
+                or check out the more detailed explanation below.
+            </p>
+            <ol>
+                <li>
+                    Choose a room name (1&ndash;20 letters and
+                    numbers, no spaces) and a username (1&ndash;8
+                    letters and numbers, no spaces), and sign in.
+                </li>
+                <li>
+                    Invite a group of friends to sign into the same
+                    room, by telling them the room name or sending
+                    them the invitation link. Note that room names
+                    (and usernames) are case-sensitive.
+                </li>
+                <li>
+                    Look at the list of usernames, and make sure you
+                    know which usernames correspond to which real
+                    people.
+                </li>
+                <li>
+                    Once everyone's signed in, if you're feeling
+                    security-conscious, make sure everyone has the
+                    same verification phrase.
+                </li>
+                <li>
+                    Check off the boxes for people you're interested
+                    in, and leave the remaining boxes blank.
+                </li>
+                <li>
+                    Click &ldquo;Send Choices&rdquo; and wait for all
+                    of the results to arrive.
+                </li>
+                <li>
+                    A Yes means you and another user are mutually
+                    interested in each other, a No means one of you
+                    isn't interested. Do what you want with this
+                    information, just don't be a jerk.
+                </li>
+                <li>
+                    Repeat with another (or the same) group of friends
+                    whenever you want!
+                </li>
+            </ol>
+            <hr/>
+            <h3>Detailed Instructions</h3>
+            <p>
+                To get started with kataomoi, choose a room name and a
+                username.  A room name can be any string of 1&ndash;20
+                letters and numbers (no spaces), and a username can be
+                any string of 1&ndash;8 letters and numbers.
+                Uppercase and lowercase letters are both allowed, and
+                all names are case-sensitive.  Enter your room name
+                and username on the main page, and (assuming your name
+                isn't already in use in the room you want) you'll be
+                signed into the room you chose.
+            </p>
+            <p>
+                Now, you need to invite some friends to join you!
+                Unlike <a href="https://dildo.io">dildo.io</a>, the
+                MIT-only matchmaking webapp that beat us to a public
+                release by several months (not that we're bitter or
+                anything), kataomoi only works with groups of users
+                who are all online at the same time.  Unfortunately,
+                this is a fundamental limitation of the SENPAI
+                cryptographic matchmaking protocol, which kataomoi is
+                based on (for more details, see the <a href="about.html">About</a> section).
+                So, to use kataomoi, you'll need to get together a
+                group of people that includes whoever you're
+                interested in; this might be your living group, a
+                living group you hang out with a lot, or just some
+                sort of circle of friends.  You all need to be signed
+                in at the same time, but you don't necessarily all
+                have to be in the same place (although, if you're
+                especially security-conscious, being in the same
+                physical room will be helpful; we'll explain more in a
+                moment).
+            </p>
+            <p>
+                Your friends will need to be in the same virtual
+                "room" as you.  To invite them, you can tell them what
+                room name you chose, or just send them the invitation
+                link that appears when you sign in.
+            </p>
+            <p>
+                Once you and your friends are all signed into the same
+                room, you'll see a list of their usernames with
+                checkboxes next to them. <b>Make absolutely sure you
+                know which usernames correspond to which real people,</b> or
+                you might end up confessing your undying interest in
+                the wrong person entirely.  kataomoi doesn't enforce
+                any constraints on usernames, except that they have to
+                be 1&ndash;8 characters long.  In particular, <b>kataomoi
+                usernames do not have to match users' MIT Kerberos
+                usernames.</b>  We have no idea who you are or what
+                your Kerberos is; we have no idea whether you're even
+                an MIT student, and we really don't care either way.
+                Being in the same physical place and talking to each
+                other is a pretty foolproof way to figure out who's
+                using what name, but if you're not all together, you
+                can use some other communication channel to confirm
+                names.  Be warned: if your communications aren't
+                securely authenticated somehow, it's always possible
+                that someone is impersonating one of your friends and
+                faking messages from them.  Proceed at your own risk.
+            </p>
+            <p>
+                At the bottom of the page, below the list of
+                usernames, you'll also see a verification phrase.  The
+                verification phrase is a 32-word nonsense phrase
+                derived from the usernames in your virtual room and
+                their associated cryptographic keys.  If someone
+                signed into the same room as you sees a different
+                verification phrase, <b>SOMETHING IS VERY WRONG AND
+                YOU SHOULD PANIC</b>.  In particular, this means that
+                one of the following is true:
+                <ul>
+                    <li>
+                        We, the operators of kataomoi, have turned
+                        evil and are trying to spy on or falsify your
+                        selections.
+                    </li>
+                    <li>
+                        Someone has taken over our server and is
+                        trying to spy on or falsify your selections.
+                    </li>
+                    <li>
+                        Someone is using the
+                        SSL-vulnerability-of-the-month to intercept
+                        and modify web traffic between your browser
+                        and our server in order to spy on or falsify
+                        your selections.
+                    </li>
+                    <li>
+                        There's a bug in our webapp.
+                    </li>
+                </ul>
+                We hope that none of these things ever happen, and
+                have taken what precautions we can to prevent them.
+                If you're not concerned about any of the first three
+                possibilities, then feel free to ignore the
+                verification phrase.  However, if you're a
+                security-conscious person like us, we recommend having
+                your group take turns reading a few words of the
+                phrase, and make sure you all agree (this is where
+                being in the same physical place comes in handy).
+                Note that the phrase will change whenever a new user
+                joins the room.
+            </p>
+            <p>
+                Even if you can't check the verification phrase with
+                everyone, checking it with as many people as you can
+                is still helpful. If any subset of your group of
+                people have the same verification phrase, then any
+                communications among at least that subset are
+                guaranteed secure (or at least, as close to guaranteed
+                as anything is in this complicated and confusing world
+                of buggy software and broken protocols).
+            </p>
+            <p>
+                Once you're satisfied that everything's secure, time
+                to select who you're interested in!  Go through the
+                list of usernames, and if you're interested in
+                someone, check off the box in the &ldquo;DTF?&rdquo;
+                column; otherwise, leave it blank.  (Note:
+                &ldquo;DTF&rdquo; means nothing. &ldquo;DTF&rdquo;
+                means everything. &ldquo;DTF&rdquo; means whatever you
+                want it to mean.  kataomoi is not exclusively, or even
+                primarily, designed for finding sexual partners; our
+                only reason for using &ldquo;DTF&rdquo; is to comply
+                with tradition.)
+            </p>
+            <p>
+                When you're done selecting people, click the
+                &ldquo;Send Choices&rdquo; button; the code running in
+                your browser will perform cryptographic exchanges with
+                the code running in everyone else's browsers, and
+                eventually give you a &ldquo;Yes&rdquo; or
+                &ldquo;No&rdquo; answer for each user in the list. A
+                Yes answer indicates mutual interest; a No answer
+                indicates that at least one of you isn't interested in
+                the other one.  Therefore, if you leave someone's
+                checkbox blank, you're guaranteed to see a No answer
+                for that person.  If you check someone's checkbox,
+                then the answer you see indicates whether they checked
+                your box or not.
+            </p>
+            <p>
+                Once you've found out everyone's answers, what you do
+                next is all up to you.  If you found a match, we
+                recommend going and talking to them, either
+                immediately or shortly afterward, and figuring out
+                what kind of things you'd like to do together.
+                &ldquo;Hey,&rdquo; you might say, &ldquo;So, um, it
+                looks like we matched on kataomoi?  Want to go grab
+                dinner at Veggie Galaxy sometime and talk about
+                things?&rdquo; Other appropriate responses include
+                (with proper consent) making out on the spot, falling
+                into a sweet embrace filled with burning passion, or
+                grabbing a duffel bag full of clothes and a box of
+                matches and riding off into the night together on a
+                stolen motorcycle.
+            </p>
+            <p>
+                And, if you find out that someone you're interested in
+                isn't interested in you: feel free to deal with that
+                in whatever way is healthiest for you, but just
+                please, don't be a jerk.  People feel the way they
+                feel, and there isn't anything you can do about it,
+                and sometimes it's terrible and sucky, but that's just
+                the way it goes.  You are a beautiful amazing person,
+                and we believe in you, and we know that someday you'll
+                find whatever it is you're looking for.  You got this.
+            </p>
+            <p>
+                Of course, you can always use kataomoi again later
+                with another (or the same) group of people.  Your
+                username and room name aren't permanent; your browser
+                forgets all of it once you close the tab, and once
+                everyone's gone, the room disappears.
+            </p>
+            <p>
+                Now, what are you waiting for?  Grab your closest
+                friends and most hated enemies and <a href="./">get started!</a>  Find
+                love!  Find lust!  Find someone to go biking with!
+                The world is at your cryptographically-secure
+                fingertips!
+            </p>
+            <div id="footer">
+                <div class="row">
+                    <a class="offset-by-three two columns" href="instructions.html">Instructions</a>
+                    <a class="two columns" href="about.html">About</a>
+                    <a class="two columns" href="https://github.com/ichung/kataomoi">Github</a>
+                </div>
+                <p>(c) 2016 Samuel Dukhovni and Istvan Chung. Code available under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>
+                <p>Contact: kataomoi at mit dot edu</p>
+            </div>
+        </div>
+    </body>
+</html>
