@@ -1,5 +1,16 @@
-.container {
-    margin-top: 6rem;
+#title {
+    margin-top: 3rem;
+    text-align: center;
+}
+
+#title a {
+    color: #000;
+    text-decoration: none;
+}
+
+#title a:hover {
+    color: #000;
+    text-decoration: underline;
 }
 
 th {
@@ -14,12 +25,8 @@ td.dtf, th.dtf {
     width: 6rem;
 }
 
-#keygen, #room, #name {
+#keygen, #room, #name, #footer {
     text-align: center;
-}
-
-#invite {
-    margin-bottom: 2rem;
 }
 
 input[disabled].button-primary {

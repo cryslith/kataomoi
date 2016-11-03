@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>kataomoi - About</title>
+        <meta name="description" content="Cryptographic matchmaking webapp">
+        <meta name="author" content="Faye Duxovni and Lily Chung">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="stylesheet" href="css/normalize.css">
+        <link rel="stylesheet" href="css/skeleton.css">
+        <link rel="stylesheet" href="css/kataomoi.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1 id="title"><a href="./">kataomoi</a></h1>
+            <h2>About</h2>
+            <p>
+                You never believed in love at first sight before, but
+                here, standing right in front of you, is the person of
+                your dreams.  They're beautiful, clever, funny; every
+                word they say holds you spellbound.  You'd like to
+                tell them how you feel, but you're too scared &mdash;
+                what if they don't like you that way, and you end up
+                making things awkward?  Your friend Max runs a
+                matchmaking webapp called
+                <a href="https://dildo.io">dildo.io</a>;
+                you could use that, but&hellip;
+            </p>
+            <p>
+                There's something about this person; maybe it's the
+                slogans on the buttons pinned to their bag, or the
+                cold flame of justice that burns deep within their
+                eyes, or the edge that creeps into their voice when
+                they talk about politics&hellip; Whatever it is, you
+                have a feeling in your gut that sometime soon, the
+                government will have a lot of very interesting
+                questions for anyone who's gotten too close to this
+                person.  You trust Max not to hand over the dildo.io
+                database willingly, but there's no telling how long
+                he'll last once they start waterboarding him.  You
+                can't use dildo.io; it's just too much of a risk.  But
+                then how can you find out how the love of your life
+                feels about you?
+            </p>
+            <hr/>
+            <h3>Concept and History</h3>
+            <p>
+                kataomoi is a webapp for finding people you're
+                interested in who are interested in you, for any
+                definition of &ldquo;interest&rdquo;.  If you've used
+                or heard of <a href="https://dildo.io">dildo.io</a>,
+                this works on similar principles: You select people
+                who you're interested in, other people select who
+                they're interested in, and if you're interested in
+                someone who's interested in you, we tell both of you.
+                What you do with that information afterwards is up to
+                you.
+            </p>
+            <p>
+                This site and dildo.io have some important
+                differences, though.  These differences all stem from
+                our key guiding principle:
+                cryptographically-guaranteed privacy.
+            </p>
+            <p>
+                When you select people on dildo.io, that information
+                goes into a database on the server.  The webapp checks
+                the database to find mutually-interested pairs, and
+                then notifies both parties.  This means that in
+                theory, a malicious server operator could also look
+                through the database and see who's interested in who,
+                mutually or otherwise.  Although we know and trust the
+                operators of dildo.io, this setup still feels
+                suboptimal, and as the paranoid crypto-anarchists we
+                are, we'd like to try and do better.
+            </p>
+            <p>
+                In late 2015, we started a months-long cryptography
+                research program with the goal of developing a
+                maximally secure, easily implementable cryptographic
+                protocol for identifying mutual interest.  Building on
+                work by
+                <a href="http://scottaaronson.com/">Scott Aaronson</a>,
+                we developed the SENPAI protocol, which allows two
+                people to learn whether they're mutually interested in
+                each other, without leaking any other information to
+                either person or to any eavesdropper or mediator.
+                Assuming the security of the RSA cryptosystem, the
+                SENPAI protocol is secure against any adversary except
+                for a partner who is willing to get caught in an
+                outright lie.  (No matchmaking protocol can protect
+                against someone who claims to be interested and then
+                changes their mind; jerks will be jerks, with or
+                without technology.)
+            </p>
+            <p>
+                Our <a href="http://duxovni.org/projects/kataomoi/senpai.pdf">research paper</a>
+                and <a href="http://duxovni.org/projects/kataomoi/senpai.odp">presentation</a> on
+                the SENPAI protocol were well-received at the
+                prestigious <a href="http://sigtbd.csail.mit.edu/">SIGTBD</a> research
+                conference.  Buoyed by this success, we continued
+                working toward a practical implementation. Many long
+                months of slacking-off later, the result now stands
+                before you: kataomoi, the cryptographic matchmaking
+                webapp that you don't need to trust with your secrets.
+            </p>
+            <hr/>
+            <h3>Differences from dildo.io</h3>
+            <p>
+                The cryptographic security of kataomoi comes along
+                with some practical design consequences, and it isn't
+                quite a drop-in replacement for dildo.io.  kataomoi
+                and dildo.io differ in the following ways:
+                <ul>
+                    <li>
+                        While dildo.io lets you select users by MIT
+                        kerberos usernames, as verified by MIT client
+                        certificates, kataomoi allows users to choose
+                        whatever usernames they want.  This could
+                        possibly be changed in a future release, but
+                        we had enough weird crypto stuff to implement
+                        already and didn't want to deal with
+                        authenticating users' names.  We also don't
+                        want this webapp to be restricted to the MIT
+                        community; anyone in the world should be free
+                        to use it, even if they didn't write a cheesy
+                        application letter and get picked out of a hat
+                        by a bunch of deans being paid to judge the
+                        value of a human's life based on 1000 words
+                        and a high school transcript.
+                    </li>
+                    <li>
+                        We don't and can't implement dildo.io's
+                        &ldquo;slut-shaming&rdquo; feature, where you
+                        can see how many other users were selected by
+                        people you matched with, and prevent matches
+                        with people who selected too many users.  The
+                        entire point of our protocol is that nobody is
+                        able to obtain this information; how many
+                        people you're interested in is your business,
+                        and if someone has questions, they're free to
+                        ask you about it.  If some jerk decides to
+                        select everyone's usernames to find out who's
+                        interested in them, then they'll get outed as
+                        a jerk and dealt with appropriately.
+                    </li>
+                    <li>
+                        While dildo.io lets you select people from the
+                        set of all current MIT students whenever you
+                        want, kataomoi only works with groups of users
+                        who are all online at the same time and signed
+                        into the same virtual room.  The requirement
+                        that users are online at the same time is a
+                        fundamental consequence of having a protocol
+                        where the server doesn't learn users' choices:
+                        since the server doesn't get any information,
+                        the users need to give each other information
+                        while exchanging messages, and so one of them
+                        must be the first to learn whether there's
+                        mutual interest.  That user then needs to share
+                        this result with the other user immediately;
+                        otherwise, they could just pretend to always
+                        be offline and never reveal the result to
+                        their communication partner.  Thus, the SENPAI
+                        protocol can only be conducted while both
+                        participants are online.
+                        <i>(Exercise for the reader: construct a
+                        protocol where, over many rounds of messages,
+                        users gain increasingly high probabilistic
+                        confidence in the result of the protocol, such
+                        that neither user has substantially more
+                        information than their partner at any given
+                        point in the exchange.  This would allow the
+                        real-time requirement to be relaxed, but it'd
+                        require a much longer exchange of messages, so
+                        it would take ages for the exchange to finish
+                        unless both users came online at some point.
+                        Seriously, though, it'd be awesome if someone
+                        designed this!)</i>
+                    </li>
+                </ul>
+            </p>
+            <hr/>
+            <h3>Data Privacy</h3>
+            <p>
+                However, in exchange for these arguable disadvantages
+                over dildo.io, kataomoi provides much stronger
+                privacy guarantees. Here is the complete list of
+                things that we learn about you when you use kataomoi:
+                <ul>
+                    <li>Your IP address (unless you're using the Tor
+                    Browser; we've tested it on this site, it should
+                    work fine)</li>
+                    <li>Your browser version</li>
+                    <li>What time you connect, sign in, and disconnect</li>
+                    <li>The room name and username you choose</li>
+                    <li>All of the same identifying information for
+                    everyone who signs into the same room as you</li>
+                </ul>
+                As long as the static web pages your browser downloads
+                from this server are correct, your browser shouldn't
+                be revealing any other information to the server.
+                (It's also possible for an evil server, or an
+                eavesdropper who can circumvent the protections of
+                HTTPS, to set and read cookies from your browser
+                without modifying the page content.)  If you're
+                worried about us turning evil or getting hacked, you
+                can clone our <a href="https://github.com/ichung/kataomoi">Github repository</a> and
+                open your local copy of the <code>client/index.html</code>
+                file in your web browser after verifying the contents;
+                this should work just as well as visiting the webpage
+                hosted here, except that it won't show you a link to
+                invite friends.
+            </p>
+            <hr/>
+            <h3>Conclusion/Manifesto</h3>
+            <p>
+                Our concerns about perfect cryptographic security and
+                malicious server operators may seem silly and
+                paranoid.  However, in today's world, too many people
+                (and especially too many programmers) don't take these
+                issues seriously enough.  We live in an age of mass
+                surveillance, perpetrated by both governments and
+                advertising companies, and facilitated by software
+                companies that are too careless or too greedy to fight
+                back.  We present kataomoi to the world as a practical
+                lesson in how little data you actually need in order
+                to solve interesting problems, and hope that it will
+                encourage others to think carefully about how the
+                systems they build affect flows of power and
+                information.
+            </p>
+            <div id="footer">
+                <div class="row">
+                    <a class="offset-by-three two columns" href="instructions.html">Instructions</a>
+                    <a class="two columns" href="about.html">About</a>
+                    <a class="two columns" href="https://github.com/ichung/kataomoi">Github</a>
+                </div>
+                <p>(c) 2016 Faye Duxovni and Lily Chung. Code available under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>
+                <p>Contact: kataomoi at mit dot edu</p>
+            </div>
+        </div>
+    </body>
+</html>
