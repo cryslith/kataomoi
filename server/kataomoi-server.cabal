@@ -5,9 +5,9 @@ name: kataomoi-server
 version: 0.1.0.0
 synopsis: Cryptographic dating webapp
 -- description:
--- license:
--- license-file:
-author: Samuel Dukhovni
+license: MIT
+license-file: ../LICENSE
+author: Samuel Dukhovni and Istvan Chung
 maintainer: kataomoi@mit.edu
 copyright: 2016 Samuel Dukhovni and Istvan Chung
 category: Web
