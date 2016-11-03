@@ -508,7 +508,7 @@ function receiveClient(sender, message) {
             data["ye"] = bytesToBigNum(d64(message["ye"]));
             data["sh"] = d64(message["sh"]);
             if (data["state"] === states.INITIATED) {
-                respond(username);
+                respond(sender);
             } else {
                 data["state"] = states.THEYINITIATED;
             }
