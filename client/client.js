@@ -23,7 +23,7 @@ var S_LEN = 32; // bytes
 
 var users = new Map();
 var room = undefined; // we should always be able to get the room we request, as long as it's a valid string
-var name = undefined;
+var ourName = undefined;
 var requestedName = undefined;
 var keypair = undefined;
 
@@ -73,7 +73,7 @@ function receiveServer(data) {
             serverError("Message missing fields");
             return;
         }
-        if (name) {
+        if (ourName) {
             serverError("Server sent us a welcome message (room: " + data["room"] + ", name: " + data["name"] + ") even though we're already signed in!");
             return;
         }
@@ -86,11 +86,11 @@ function receiveServer(data) {
             return;
         }
         location.hash = room;
-        name = data["name"];
-        newUser(name, keypair.publicKey.n, true);
+        ourName = data["name"];
+        newUser(ourName, keypair.publicKey.n, true);
         hide("signin");
         showMessage("room", room, msgcolors.INFO);
-        showMessage("name", "Signed in as " + name, msgcolors.INFO);
+        showMessage("name", "Signed in as " + ourName, msgcolors.INFO);
         showInvite();
         show("users");
         break;
@@ -115,7 +115,7 @@ function receiveServer(data) {
             serverError("Message missing fields");
             return;
         }
-        if (!name) {
+        if (!ourName) {
             serverError("Server sent us a list of users before confirming our sign-in!");
             return;
         }
@@ -131,11 +131,11 @@ function receiveServer(data) {
             otherError("Wrapped client message missing fields; dropped"); // We don't want to accuse the alleged sender of an unauthenticated message
             return;
         }
-        if (data["recipient"] !== name) {
+        if (data["recipient"] !== ourName) {
             serverError("Server sent us a client message from " + data["sender"] + " to " + data["recipient"]);
             return;
         }
-        if (data["sender"] === name) {
+        if (data["sender"] === ourName) {
             serverError("Server sent us a client message allegedly from us!");
             return;
         }
@@ -156,7 +156,7 @@ function receiveServer(data) {
             serverError("Message missing fields");
             return;
         }
-        if (data["recipient"] === name) {
+        if (data["recipient"] === ourName) {
             serverError("Server claimed that we're disconnected!");
             return;
         }
@@ -181,7 +181,7 @@ function socketClosed(event) {
     disable("button_selections");
     clearInterval(keepalive_intervalID);
     [...users].forEach(function(value) {
-        if (value[0] !== name) {
+        if (value[0] !== ourName) {
             disconnectUser(value[0]);
         }
     });
@@ -232,7 +232,7 @@ function updateUsers(users, newUsernames) {
 
         if (usernameOK(username)) {
             var userPubkey = bytesToBigNum(d64(newUsernames[username]["pubkey"]));
-            if (username === name) { // we add ourself separately so the server can't lie to us about ourself
+            if (username === ourName) { // we add ourself separately so the server can't lie to us about ourself
                 if (!keypair.publicKey.n.equals(userPubkey)) {
                     serverError("Server tried to give us incorrect public key!");
                     return;
@@ -262,8 +262,11 @@ function updateUsers(users, newUsernames) {
 
     [...users].forEach(function(value) {
         var username = value[0];
-        if (!(username in newUsernames) && username !== name) {
-            serverError("Server tried to remove username " + username);
+        if (!(username in newUsernames)) {
+            if (username !== ourName)
+                serverError("Server tried to remove username " + username);
+            else
+                serverError("Server tried to remove us from user list!");
         }
     });
 
@@ -300,7 +303,7 @@ function sendSelections() {
     [...users].forEach(function(value) {
         var username = value[0];
         var data = value[1];
-        if (username === name || !data["connected"]) {
+        if (username === ourName || !data["connected"]) {
             return;
         }
         var checkbox = document.getElementById("button_" + username);
@@ -599,7 +602,7 @@ function sendServer(x) {
 function sendClient(recipient, message) {
     var encoded = encodePayload(recipient, message);
     encoded["type"] = "client";
-    encoded["sender"] = name;
+    encoded["sender"] = ourName;
     encoded["recipient"] = recipient;
     sendServer(encoded);
 }
@@ -612,7 +615,7 @@ function receiveClient(sender, message) {
         case states.GENERATING:
         case states.INITIATED:
             // resolve race condition via usernames
-            if (name < sender) {
+            if (ourName < sender) {
                 break; // ignore
             }
             // fall-through
@@ -802,8 +805,8 @@ function addUserRow(username, isConnected) {
     resultCell.className = "result";
     resultCell.id = "result_" + username;
 
-    if (username == name) {
-        nameCell.textContent = name;
+    if (username == ourName) {
+        nameCell.textContent = ourName;
         dtfCell.textContent = "(you)";
     } else {
         var nameLabel = document.createElement("label");
