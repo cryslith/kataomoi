@@ -18,7 +18,7 @@
     <body>
         <div class="container">
             <h1 id="title">kataomoi</h1>
-            <p id="error" style="display:none;"></p>
+            <p id="errorAlert" style="display:none; color:red;"></p>
             <div id="keygen">
                 <p>Generating cryptographic keys...</p>
                 <img src="loading.gif"/>
@@ -64,6 +64,11 @@
                 <h5>Verification Phrase</h5>
                 <h6>If this phrase isn't the same for every user in this room, someone may be eavesdropping or tampering with your connection:</h6>
                 <p id="phrase"></p>
+            </div>
+            <div id="errors" style="display:none;">
+                <h5>Error Log</h5>
+                <ul id="errorList" style="color:red;">
+                </ul>
             </div>
             <div id="footer">
                 <div class="row">

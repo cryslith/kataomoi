@@ -23,12 +23,6 @@ type RoomData = Map.Map User UserData
 -- or failure. In the case of failure, the room must remain unchanged.
 type RoomAlterer = Maybe RoomData -> (Bool, Maybe RoomData)
 
-getConn :: UserData -> Maybe (TChan String)
-getConn = fst
-
-getKey :: UserData -> PublicKey
-getKey = snd
-
 type ServerState = Map.Map Room RoomData
 
 port = 9001
@@ -81,9 +75,9 @@ markUserDisconnected u mrd =
      case mrd of
        Nothing -> Nothing
        Just rd ->
-           let rd' = Map.adjust (\(mc, k) -> (Nothing, k)) u rd
+           let rd' = Map.adjust (\(_, k) -> (Nothing, k)) u rd
            in
-             if Map.null $ Map.filter (\(mc, k) -> isJust mc) rd'
+             if Map.null $ Map.filter (\(mc, _) -> isJust mc) rd'
              then Nothing
              else Just rd'
     )
@@ -91,8 +85,11 @@ markUserDisconnected u mrd =
 send :: WS.Connection -> String -> IO ()
 send conn = WS.sendTextData conn . T.pack
 
-sendJSON :: J.JSON a => WS.Connection -> a -> IO ()
-sendJSON conn = (send conn) . J.encode
+sendMsg :: WS.Connection -> String -> [(String, J.JSValue)] -> IO ()
+sendMsg conn t = (send conn) .
+                 J.encode .
+                 J.toJSObject .
+                 (("type", J.showJSON t):)
 
 sendFromChan :: WS.Connection -> TChan String -> IO ()
 sendFromChan conn chan = do
@@ -115,42 +112,46 @@ delegateSendAllUsers rd =
             )
             rd
 
-forwardMessage :: ServerState -> Room -> User -> String -> IO Bool
+data ForwardError = Nonexistent | Disconnected
+
+forwardMessage :: ServerState -> Room -> User -> String -> IO (Maybe ForwardError)
 forwardMessage state room user msg =
   case Map.lookup room state >>= Map.lookup user of
     Just (Just chan, _) -> do
       delegateSend chan msg
-      return True
-    Nothing -> return False
+      return Nothing
+    Just (Nothing, _) -> return $ Just Disconnected
+    Nothing -> return $ Just Nonexistent
 
 sendWelcome :: WS.Connection -> Room -> User -> IO ()
 sendWelcome conn r u =
-    sendJSON conn $
-         J.toJSObject [ ("type", J.showJSON "welcome")
-                      , ("room", J.showJSON r)
-                      , ("name", J.showJSON u)
-                      ]
+    sendMsg conn "welcome"
+                [ ("room", J.showJSON r)
+                , ("name", J.showJSON u)
+                ]
 
 sendUnavailable :: WS.Connection -> Room -> User -> IO ()
 sendUnavailable conn r u =
-    sendJSON conn $
-         J.toJSObject [ ("type", J.showJSON "unavailable")
-                      , ("room", J.showJSON r)
-                      , ("name", J.showJSON u)
-                      ]
+    sendMsg conn "unavailable"
+                [ ("room", J.showJSON r)
+                , ("name", J.showJSON u)
+                ]
+
+sendDisconnected :: WS.Connection -> User -> IO ()
+sendDisconnected conn recipient =
+    sendMsg conn "disconnected"
+                [("recipient", J.showJSON recipient)]
 
 sendError :: WS.Connection -> String -> String -> IO ()
 sendError conn s m =
-    sendJSON conn $
-         J.toJSObject [ ("type", J.showJSON "error")
-                      , ("error", J.showJSON s)
-                      , ("message", J.showJSON m)
-                      ]
+    sendMsg conn "error"
+                 [ ("error", J.showJSON s)
+                 , ("message", J.showJSON m)
+                 ]
 
 sendKeepalive :: WS.Connection -> IO ()
 sendKeepalive conn =
-  sendJSON conn $
-       J.toJSObject [ ("type", J.showJSON "keepalive") ]
+    sendMsg conn "keepalive" []
 
 server :: MVar ServerState -> WS.ServerApp
 server mstate pending = do
@@ -205,8 +206,11 @@ server mstate pending = do
                       then sendError conn "incorrect sender" jsonString
                       else do
                         s <- readMVar mstate
-                        x <- forwardMessage s r recipient jsonString
-                        if x then return () else sendError conn "no such recipient" jsonString
+                        merr <- forwardMessage s r recipient jsonString
+                        case merr of
+                          Nothing -> return ()
+                          Just Nonexistent -> sendError conn "no such recipient" jsonString
+                          Just Disconnected -> sendDisconnected conn recipient
                   _ -> sendError conn "not joined yet" jsonString
           else Nothing
     case y of

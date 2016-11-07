@@ -78,7 +78,7 @@ server. Its fields are:
   will be the user's public key for wrapping all client-to-client
   messages.
 
-## keepalive
+### keepalive
 
 Sent by the client periodically to keep the connection alive; has no
 fields other than "type".  Upon receiving this message, the server will
@@ -97,7 +97,7 @@ Fields:
 * room: the requested room
 * name: the requested name
 
-## keepalive
+### keepalive
 
 Sent by the server in reply to a keepalive message from the client; has
 no fields other than "type".
@@ -125,6 +125,15 @@ Fields:
   objects, with a key "pubkey" whose value is a base64 encoded RSA
   modulus; and a key "connected", whose value is a boolean indicating
   whether the user is currently connected to the server.
+
+### disconnected
+
+Sent in response to a client message when the recipient has already
+disconnected.
+
+Fields:
+
+* recipient: the name of the disconnected recipient
 
 ### error
 
