@@ -53,8 +53,7 @@ window.onload = function() {
 
 
 function receiveServer_raw(event) {
-    consoleLog("received message from server:");
-    consoleLog(event.data);
+    consoleLog("received message from server: " + event.data);
     var msg;
     try {
         msg = JSON.parse(event.data);
