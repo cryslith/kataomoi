@@ -202,7 +202,7 @@ function signIn() {
     }
 
     if (ok) {
-        hide("error");
+        hide("errorAlert");
         join();
     } else {
         showAlert(errmsg);
