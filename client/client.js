@@ -2,10 +2,11 @@ var states = {INITIAL: "initial", GENERATING: "generating",
               INITIATED: "initiated", THEYINITIATED: "theyinitiated",
               RESPONDED: "responded", DECRYPTED: "decrypted",
               REVEALED: "revealed", CONFIRMED: "confirmed",
-              CHEAT: "cheat", DISCONNECTED: "disconnected"};
-// DISCONNECTED indicates that neither party has learned anything yet;
-// if a partner disconnects after learning something, the state will
-// be either CONFIRMED or CHEAT.
+              CHEAT: "cheat", DISCONNECTED: "disconnected",
+              ERROR: "error"};
+// DISCONNECTED and ERROR indicate that neither party has learned
+// anything yet; if a partner disconnects or generates an error after
+// learning something, the state will be either CONFIRMED or CHEAT.
 
 var likes = {UNKNOWN: "unknown", DONTLIKE: 0, LIKE: 1};
 var msgcolors = {INFO: "", SUCCESS: "green", ERROR: "red"};
@@ -41,7 +42,8 @@ window.onload = function() {
                         function(e, kp) {
                             hide("keygen");
                             if (e) {
-                                showMessage("error", "Key generation error", msgcolors.ERROR);
+                                consoleLog(e);
+                                showAlert("Key generation error! Try reloading the page.");
                             } else {
                                 keypair = kp;
                                 show("signin");
@@ -51,65 +53,130 @@ window.onload = function() {
 
 
 function receiveServer_raw(event) {
-    console.log(event.data);
-    receiveServer(JSON.parse(event.data));
+    consoleLog("received message from server:");
+    consoleLog(event.data);
+    var msg;
+    try {
+        msg = JSON.parse(event.data);
+    } catch (e) {
+        serverError("Error parsing JSON data from server!");
+        consoleLog(e);
+        return;
+    }
+    receiveServer(msg);
 }
 
 function receiveServer(data) {
     switch (data["type"]) {
-        // XXX deal with server sending us these messages at inappropriate times.
-        // In particular, don't let server send "users" before "welcome".
     case "welcome":
-        if (data["name"] !== requestedName) {
-            console.log("server tried to assign us unrequested name: " + data["name"]);
-        } else if (data["room"] !== room) {
-            console.log("server tried to assign us unrequested room: " + data["room"]);
-        } else {
-            location.hash = room;
-            name = data["name"];
-            newUser(name, keypair.publicKey.n, true);
-            hide("signin");
-            showMessage("room", room, msgcolors.INFO);
-            showMessage("name", "Signed in as " + name, msgcolors.INFO);
-            showInvite();
-            show("users");
+        if (!("room" in data && "name" in data)) {
+            serverError("Message missing fields");
+            return;
         }
+        if (name) {
+            serverError("Server sent us a welcome message (room: " + data["room"] + ", name: " + data["name"] + ") even though we're already signed in!");
+            return;
+        }
+        if (data["name"] !== requestedName) {
+            serverError("Server tried to assign us a name we didn't request: " + data["name"]);
+            return;
+        }
+        if (data["room"] !== room) {
+            serverError("Server tried to assign us a room we didn't request: " + data["room"]);
+            return;
+        }
+        location.hash = room;
+        name = data["name"];
+        newUser(name, keypair.publicKey.n, true);
+        hide("signin");
+        showMessage("room", room, msgcolors.INFO);
+        showMessage("name", "Signed in as " + name, msgcolors.INFO);
+        showInvite();
+        show("users");
         break;
     case "unavailable":
-        if (data["name"] !== requestedName) {
-            console.log("server rejected unrequested name: " + data["name"]);
-        } else if (data["room"] !== room) {
-            console.log("server rejected name in unrequested room: " + data["room"]);
-        } else {
-            showMessage("error",
-                        "The username " + data["name"] + " is unavailable in room " +
-                        data["room"] + ". " + "Please choose a different name.",
-                        msgcolors.ERROR);
+        if (!("room" in data && "name" in data)) {
+            serverError("Message missing fields");
+            return;
         }
+        if (data["name"] !== requestedName) {
+            serverError("Server rejected a name we didn't request: " + data["name"]);
+            return;
+        }
+        if (data["room"] !== room) {
+            serverError("Server rejected our name in a room we didn't request: " + data["room"]);
+            return;
+        }
+        showAlert("The username " + data["name"] + " is unavailable in room " +
+                  data["room"] + ". " + "Please choose a different name.");
         break;
     case "users":
+        if (!("users" in data)) {
+            serverError("Message missing fields");
+            return;
+        }
+        if (!name) {
+            serverError("Server sent us a list of users before confirming our sign-in!");
+            return;
+        }
         updateUsers(users, data["users"]);
         break;
     case "client":
-        if (data["recipient"] !== name) {
-            console.log("spurious message");
+        if (!("sender" in data
+              && "recipient" in data
+              && "key" in data
+              && "iv" in data
+              && "payload" in data
+              && "signature" in data)) {
+            otherError("Wrapped client message missing fields; dropped"); // We don't want to accuse the alleged sender of an unauthenticated message
             return;
         }
-        receiveClient(data["sender"], decodePayload(data));
-        break;
-    case "error":
-        console.log("server error: " + data["error"]);
+        if (data["recipient"] !== name) {
+            serverError("Server sent us a client message from " + data["sender"] + " to " + data["recipient"]);
+            return;
+        }
+        if (data["sender"] === name) {
+            serverError("Server sent us a client message allegedly from us!");
+            return;
+        }
+        var clientMsg;
+        try {
+            clientMsg = decodePayload(data);
+        } catch (e) {
+            otherError("Malformed message from " + data["sender"] + "; dropped");
+            console.log(e);
+            return;
+        }
+        receiveClient(data["sender"], clientMsg);
         break;
     case "keepalive":
         break;
+    case "disconnected":
+        if (!("recipient" in data)) {
+            serverError("Message missing fields");
+            return;
+        }
+        if (data["recipient"] === name) {
+            serverError("Server claimed that we're disconnected!");
+            return;
+        }
+        disconnectUser(data["recipient"]);
+        break;
+    case "error":
+        if (!("error" in data)) {
+            serverError("Message missing fields");
+            return;
+        }
+        serverError("Server sent us an error message: " + data["error"]);
+        break;
     default:
-        console.log("invalid message type");
-        return;
+        serverError("Server sent us a message with an unknown type!");
+        break;
     }
 }
 
 function socketClosed(event) {
-    showMessage("error", "Lost connection with server!", msgcolors.ERROR);
+    showAlert("Lost connection with server!");
     disable("button_signin");
     disable("button_selections");
     clearInterval(keepalive_intervalID);
@@ -138,7 +205,7 @@ function signIn() {
         hide("error");
         join();
     } else {
-        showMessage("error", errmsg, msgcolors.ERROR);
+        showAlert(errmsg);
     }
 }
 
@@ -157,19 +224,28 @@ function roomOK(roomname) {
 
 function updateUsers(users, newUsernames) {
     for (var username in newUsernames) {
+        if (!("pubkey" in newUsernames[username]
+              && "connected" in newUsernames[username])) {
+            serverError("Invalid user list");
+            return;
+        }
+
         if (usernameOK(username)) {
             var userPubkey = bytesToBigNum(d64(newUsernames[username]["pubkey"]));
             if (username === name) { // we add ourself separately so the server can't lie to us about ourself
                 if (!keypair.publicKey.n.equals(userPubkey)) {
-                    console.log("Server tried to give us incorrect public key!");
+                    serverError("Server tried to give us incorrect public key!");
+                    return;
                 }
                 if (!newUsernames[username]["connected"]) {
-                    console.log("Server said we weren't connected!");
+                    serverError("Server listed us as disconnected!");
+                    return;
                 }
             } else if (users.has(username)) {
                 var data = users.get(username);
                 if (!data["pubkey"].equals(userPubkey)) {
-                    console.log("Server tried to change a user's public key!");
+                    serverError("Server tried to change the public key of user " + username + "!");
+                    return;
                 }
                 if (data["connected"] && !newUsernames[username]["connected"]) {
                     disconnectUser(username);
@@ -179,14 +255,15 @@ function updateUsers(users, newUsernames) {
             }
         }
         else {
-            console.log("illegal username: " + username);
+            serverError("Server listed an illegal username!");
+            return;
         }
     }
 
     [...users].forEach(function(value) {
         var username = value[0];
         if (!(username in newUsernames) && username !== name) {
-            console.log("server tried to remove username");
+            serverError("Server tried to remove username " + username);
         }
     });
 
@@ -204,7 +281,7 @@ function updateUsers(users, newUsernames) {
         return 0;
     });
     roomData.unshift(room);
-    console.log(roomData);
+    consoleLog(roomData);
     showMessage("phrase", hashPhrase(JSON.stringify(roomData)), msgcolors.INFO);
 }
 
@@ -247,7 +324,7 @@ function sendSelection(username) {
         respond(username);
         break;
     default:
-        console.log("invalid state " + state);
+        otherError("Tried to begin protocol exchange with user " + username + " in invalid state: " + state);
         break;
     }
 
@@ -272,19 +349,16 @@ function generateSenpaiKey(username) {
     data["state"] = states.GENERATING;
     rsa.generateKeyPair({bits: SENPAI_BITS, e: SENPAI_PUBLIC_EXPONENT, workers: -1},
                         function(e, kp) {
-                            if (e) {
-                                console.log("error generating SENPAI key");
-                                return;
+                            if (data["state"] === states.GENERATING) {
+                                if (e) {
+                                    clientError(username, "Error generating SENPAI key!");
+                                    consoleLog(e);
+                                } else {
+                                    data["keypair"] = kp;
+                                    initiate(username);
+                                }
+                                displayResult(username);
                             }
-                            if (data["state"] === states.THEYINITIATED) {
-                                respond(username);
-                            } else if (data["state"] === states.DISCONNECTED) {
-                                // NOP
-                            } else {
-                                data["keypair"] = kp;
-                                initiate(username);
-                            }
-                            displayResult(username);
                         });
 }
 
@@ -329,7 +403,7 @@ function respond(username) {
     var n = data["n"];
     if (!(n.gcd(data["ye"]).equals(forge.jsbn.BigInteger.ONE) &&
           n.gcd(data["xe"]).equals(forge.jsbn.BigInteger.ONE))) {
-        data["state"] = states.CHEAT;
+        clientCheat(username, "One of xe and ye isn't coprime to n!")
         return;
     }
     var nbytes = Math.ceil(n.bitLength() / 8);
@@ -356,6 +430,10 @@ function decrypt(username) {
     sendClient(username, {"type": "decrypt",
                           "wr": e64(wr_bytes)});
 
+    data["timeout"] = setTimeout(function() {
+        clientCheat(username, "Took too long to respond after learning result!");
+    }, 120000);
+
     data["state"] = states.DECRYPTED;
 }
 
@@ -368,34 +446,48 @@ function reveal(username) {
     var w_bytes = bigNumToBytes(w);
     var n_bytes = Math.ceil(data["n"].bitLength() / 8);
     var w_bytes = zero_pad(w_bytes, n_bytes);
-    if (w_bytes.length !== n_bytes) {
-        console.log("bad w_bytes length " + w_bytes.length);
+    var pubkey = rsa.setPublicKey(data["n"], seBI);
+    var w_decode;
+    try {
+        w_decode = forge.pkcs1.decode_rsa_oaep(pubkey, w_bytes, '');
+    } catch (e) {
+        clientError(username, "Invalid RSAES-OEAP encoding for w!");
+        consoleLog(e);
         return;
     }
-    var pubkey = rsa.setPublicKey(data["n"], seBI);
-    var w_decode = forge.pkcs1.decode_rsa_oaep(pubkey, w_bytes, '');
-    // TODO: catch errors from invalid OAEP
     var like = getFirstBit(w_decode) === 1;
     data["likemutual"] = like ? likes.LIKE : likes.DONTLIKE;
 
+
+    // We don't need to check the hash of 's' if 'like' is true, but
+    // we want this whole operation to be constant-time
+    var s = w_decode.slice(1);
+    var sh_md = forge.md.sha256.create();
+    sh_md.update(s);
+    var sh = sh_md.digest().bytes();
+    if (sh !== data["sh"]) {
+        if (!like) {
+            clientCheat(username, "Verification string hash doesn't match!");
+            consoleLog("Precommitted hash for " + username);
+            consoleLog(data["sh"]);
+            consoleLog("Hash of received string from " + username);
+            consoleLog(sh);
+            return;
+        }
+    }
+    var fake_s = forge.random.getBytesSync(S_LEN);
     if (like) {
         sendClient(username, {"type": "reveal",
                               "result": "true_",
-                              "s": e64(forge.random.getBytesSync(S_LEN))});
+                              "s": e64(fake_s)});
     }
     else {
-        var s = w_decode.slice(1);
-        var sh_md = forge.md.sha256.create();
-        sh_md.update(s);
-        var sh = sh_md.digest().bytes();
-        if (sh !== data["sh"]) {
-            console.log("detected cheating via s");
-            data["state"] = states.CHEAT;
-            return;
-        }
         sendClient(username, {"type": "reveal",
                               "result": "false",
                               "s": e64(s)});
+        data["timeout"] = setTimeout(function() {
+            clientCheat(username, "Took too long to respond during verification phase!");
+        }, 120000);
     }
 
 
@@ -404,10 +496,16 @@ function reveal(username) {
 
 function confirm(username) {
     var data = users.get(username);
-    if (data["likemutual"] === likes.DONTLIKE) {
-        if (data["so"] !== data["s"]) {
-            console.log("detected cheating via s");
-            data["state"] = states.CHEAT;
+
+    clearTimeout(data["timeout"]);
+
+    if (data["so"] !== data["s"]) {
+        if (data["likemutual"] === likes.DONTLIKE) {
+            clientCheat(username, "Incorrect verification string!");
+            consoleLog("Actual verification string for " + username);
+            consoleLog(data["s"]);
+            consoleLog("Verification string received from " + username);
+            consoleLog(data["so"]);
             return;
         }
     }
@@ -420,26 +518,40 @@ function confirm(username) {
 
 function verify(username) {
     var data = users.get(username);
+
+    clearTimeout(data["timeout"]);
+
     var x = data["x"];
     var pubkey = rsa.setPublicKey(data["n"], seBI);
     var xe = pubkey.encrypt(x, "RAW");
 
     if (data["xe"].toString() !== bytesToBigNum(xe).toString()) {
-        console.log(data["xe"].toString());
-        console.log(bytesToBigNum(xe).toString());
-        console.log("detected cheating via x");
-        data["state"] = states.CHEAT;
+        clientCheat(username, "Encrypted x values don't match!")
+        consoleLog("Original encrypted x from " + username);
+        consoleLog(data["xe"].toString());
+        consoleLog("Encryption of revealed x from " + username);
+        consoleLog(bytesToBigNum(xe).toString());
         return;
     }
 
-    var x_decode = forge.pkcs1.decode_rsa_oaep(pubkey, x, '');
+    var x_decode;
+    try {
+        x_decode = forge.pkcs1.decode_rsa_oaep(pubkey, x, '');
+    } catch (e) {
+        clientError("Invalid RSAES-OEAP encoding for x!");
+        consoleLog(e);
+        return;
+    }
     var s = x_decode.slice(1);
     var sh_md = forge.md.sha256.create();
     sh_md.update(s);
     var sh = sh_md.digest().bytes();
     if (sh !== data["sh"]) {
-        console.log("detected cheating via s");
-        data["state"] = states.CHEAT;
+        clientCheat(username, "Verification string hash doesn't match!");
+        consoleLog("Precommitted hash for " + username);
+        consoleLog(data["sh"]);
+        consoleLog("Hash of string in revealed x from " + username);
+        consoleLog(sh);
         return;
     }
 
@@ -450,27 +562,29 @@ function verify(username) {
 function disconnectUser(username) {
     var data = users.get(username);
 
+    if (!data["connected"])
+        return;
+
     data["connected"] = false;
     markUserRowDisconnected(username);
 
     switch (data["state"]) {
     case states.DECRYPTED:
-        console.log("user disconnected without sharing answer!");
-        data["state"] = states.CHEAT;
+        clientCheat(username, "Partner learned the result and disconnected without sharing it!");
         break;
     case states.REVEALED:
-        console.log("user disconnected without sharing x");
         if (data["likemutual"] === likes.LIKE) {
             data["state"] = states.CONFIRMED; // no further verification is actually needed
         } else {
-            data["state"] = states.CHEAT;
+            clientCheat(username, "Partner disconnected before we'd finished verifying the result!");
         }
         break;
     case states.CHEAT:
     case states.CONFIRMED:
+    case states.ERROR:
         break;
     default:
-        console.log("user disconnected");
+        consoleLog("user " + username + " disconnected");
         data["state"] = states.DISCONNECTED;
         break;
     }
@@ -503,60 +617,81 @@ function receiveClient(sender, message) {
             }
             // fall-through
         case states.INITIAL:
+            if (!("n" in message
+                  && "xe" in message
+                  && "ye" in message
+                  && "sh" in message)) {
+                clientError(sender, "Message missing fields");
+                return;
+            }
             data["n"] = bytesToBigNum(d64(message["n"]));
             data["xe"] = bytesToBigNum(d64(message["xe"]));
             data["ye"] = bytesToBigNum(d64(message["ye"]));
             data["sh"] = d64(message["sh"]);
-            if (data["state"] === states.INITIATED) {
-                respond(sender);
-            } else {
+            if (data["state"] === states.INITIAL) {
                 data["state"] = states.THEYINITIATED;
+            } else {
+                respond(sender);
             }
             break;
         default:
-            console.log("wrong state for initiate");
-            break;
+            clientError(sender, "Sent 'initiate' message when we were in state " + data["state"]);
+            return;
         }
         break;
     case "respond":
         if (data["state"] !== states.INITIATED) {
-            console.log("wrong state for respond");
-            break;
+            clientError(sender, "Sent 'respond' message when we were in state " + data["state"]);
+            return;
+        }
+        if (!("wre" in message)) {
+            clientError(sender, "Message missing fields");
+            return;
         }
         data["wre"] = bytesToBigNum(d64(message["wre"]));
         decrypt(sender);
         break;
     case "decrypt":
         if (data["state"] !== states.RESPONDED) {
-            console.log("wrong state for decrypt");
-            break;
+            clientError(sender, "Sent 'decrypt' message when we were in state " + data["state"]);
+            return;
+        }
+        if (!("wr" in message)) {
+            clientError(sender, "Message missing fields");
+            return;
         }
         data["wr"] = bytesToBigNum(d64(message["wr"]));
         reveal(sender);
         break;
     case "reveal":
         if (data["state"] !== states.DECRYPTED) {
-            console.log("wrong state for reveal");
-            break;
+            clientError(sender, "Sent 'reveal' message when we were in state " + data["state"]);
+            return;
+        }
+        if (!("result" in message && "s" in message)) {
+            clientError(sender, "Message missing fields");
+            return;
         }
         data["likemutual"] = message["result"] === "true_"
             ? likes.LIKE : likes.DONTLIKE;
-        if ("s" in message) {
-            data["so"] = d64(message["s"]);
-        }
+        data["so"] = d64(message["s"]);
         confirm(sender);
         break;
     case "confirm":
         if (data["state"] !== states.REVEALED) {
-            console.log("wrong state for confirm");
-            break;
+            clientError(sender, "Sent 'confirm' message when we were in state " + data["state"]);
+            return;
+        }
+        if (!("x" in message)) {
+            clientError(sender, "Message missing fields");
+            return;
         }
         data["x"] = d64(message["x"]);
         verify(sender);
         break;
     default:
-        console.log("invalid message type");
-        break;
+        clientError(sender, "Invalid message type");
+        return;
     }
 
     displayResult(sender);
@@ -625,6 +760,10 @@ function displayResult(username) {
         break;
     case states.DISCONNECTED:
         result = "Disconnected";
+        break;
+    case states.ERROR:
+        result = "An error occurred. See error log for details.";
+        msgcolor = msgcolors.ERROR;
         break;
     }
 
@@ -714,6 +853,78 @@ function showInvite() {
     show("invite");
 }
 
+function logError(msg) {
+    var errorItem = document.createElement("li");
+    errorItem.textContent = msg;
+    document.getElementById("errorList").appendChild(errorItem);
+    show("errors");
+}
+
+function showAlert(msg) {
+    showMessage("errorAlert", msg, msgcolors.ERROR);
+}
+
+
+// Apparently console is non-standard... *sigh*
+function consoleLog(data) {
+    if (window.console && console.log)
+        console.log(data);
+}
+
+
+// Error wrappers
+
+function serverError(msg) {
+    socket.close();
+    showAlert("An error occurred communicating with the server; you have been disconnected. See the error log below or your browser's developer console for more information.")
+    consoleLog(msg);
+    logError(msg);
+}
+
+function clientError(username, msg) {
+    var errorString = username + ": " + msg;
+    consoleLog(errorString);
+    logError(errorString);
+
+    var data = users.get(username);
+    switch (data["state"]) {
+    case states.DECRYPTED:
+        clientCheat(username, "Partner learned the result and then sent an invalid message without sharing the result!");
+        break;
+    case states.REVEALED:
+        if (data["likemutual"] === likes.LIKE) {
+            data["state"] = states.CONFIRMED; // no further verification is actually needed
+        } else {
+            clientCheat(username, "Partner sent an invalid message before we'd finished verifying the result!");
+        }
+        break;
+    case states.CHEAT:
+    case states.CONFIRMED:
+    case states.ERROR:
+        break;
+    default:
+        data["state"] = states.ERROR;
+        break;
+    }
+
+    displayResult(username);
+}
+
+function clientCheat(username, msg) {
+    var errorString = username + ": " + msg;
+    consoleLog(errorString);
+    logError(errorString);
+
+    var data = users.get(username);
+    data.state = states.CHEAT;
+
+    displayResult(username);
+}
+
+function otherError(msg) {
+    consoleLog(msg);
+    logError(msg);
+}
 
 // Crypto wrappers
 
@@ -767,7 +978,7 @@ function decodePayload(data) {
     decipher.finish();
 
     var plaintext = decipher.output.bytes();
-    console.log(plaintext);
+    consoleLog(plaintext);
     return JSON.parse(plaintext);
 }
 
