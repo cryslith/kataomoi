@@ -4,13 +4,16 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import qualified Control.Exception as C
 import qualified Data.Foldable as F (mapM_)
-import Control.Monad (forever, when)
-import Control.Concurrent (MVar, newMVar, modifyMVarMasked_, readMVar, forkIO)
+import Control.Monad (forever, when, void)
+import Control.Concurrent (MVar, newMVar, modifyMVarMasked_, readMVar, swapMVar, forkIO)
 import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TChan (TChan, newTChan, readTChan, writeTChan)
 import Data.IORef
-import Data.Maybe (isJust, fromMaybe)
+import Data.Maybe (isJust, fromMaybe, listToMaybe)
 import Control.Lens.At (at)
+import Data.Time.LocalTime (getZonedTime)
+import Data.Time.Format (formatTime, defaultTimeLocale)
+import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
 
 type User = String
 type PublicKey = String
@@ -29,6 +32,31 @@ port = 9001
 
 newServerState :: ServerState
 newServerState = Map.empty
+
+data LogLevel =
+      None     -- don't print anything
+    | Error    -- print details of errors
+    | Event    -- print high-level descriptions of all events
+    | Message  -- print all non-keepalive messages, incoming or outgoing
+    | All      -- print all messages (there will be lots of keepalive spew)
+    deriving (Eq, Ord, Show, Read)
+
+fmtSubject :: Maybe Room -> Maybe User -> String
+fmtSubject r n =
+    case (r, n) of
+      (Just room, Just name) ->
+          name ++ "@" ++ room
+      (Just room, Nothing) -> "#" ++ room
+      _ -> "[anon]"
+
+logEntry :: MVar LogLevel -> LogLevel -> Maybe Room -> Maybe User -> String -> IO ()
+logEntry mlevel entryLevel r n desc = do
+  curLevel <- readMVar mlevel
+  when (curLevel >= entryLevel) $ do
+    time <- getZonedTime
+    let fmtTime = formatTime defaultTimeLocale "%F %T %z" time
+    putStrLn $ fmtTime ++ " " ++ fmtSubject r n ++ ": " ++ show entryLevel ++ ": " ++ desc
+
 
 usersJSON :: RoomData -> J.JSObject J.JSValue
 usersJSON =
@@ -82,19 +110,16 @@ markUserDisconnected u mrd =
              else Just rd'
     )
 
-send :: WS.Connection -> String -> IO ()
-send conn = WS.sendTextData conn . T.pack
+send :: WS.Connection -> (String -> IO ()) -> String -> IO ()
+send conn logger s = do
+  WS.sendTextData conn $ T.pack s
+  logger s
 
-sendMsg :: WS.Connection -> String -> [(String, J.JSValue)] -> IO ()
-sendMsg conn t = (send conn) .
-                 J.encode .
-                 J.toJSObject .
-                 (("type", J.showJSON t):)
-
-sendFromChan :: WS.Connection -> TChan String -> IO ()
-sendFromChan conn chan = do
-  s <- atomically $ readTChan chan
-  send conn s
+sendMsg :: WS.Connection -> (String -> IO ()) -> String -> [(String, J.JSValue)] -> IO ()
+sendMsg conn logger t = (send conn logger) .
+                        J.encode .
+                        J.toJSObject .
+                        (("type", J.showJSON t):)
 
 delegateSend :: TChan String -> String -> IO ()
 delegateSend c s = atomically $ writeTChan c s
@@ -123,35 +148,35 @@ forwardMessage state room user msg =
     Just (Nothing, _) -> return $ Just Disconnected
     Nothing -> return $ Just Nonexistent
 
-sendWelcome :: WS.Connection -> Room -> User -> IO ()
-sendWelcome conn r u =
-    sendMsg conn "welcome"
+sendWelcome :: WS.Connection -> (String -> IO ()) -> Room -> User -> IO ()
+sendWelcome conn logger r u =
+    sendMsg conn logger "welcome"
                 [ ("room", J.showJSON r)
                 , ("name", J.showJSON u)
                 ]
 
-sendUnavailable :: WS.Connection -> Room -> User -> IO ()
-sendUnavailable conn r u =
-    sendMsg conn "unavailable"
+sendUnavailable :: WS.Connection -> (String -> IO ()) -> Room -> User -> IO ()
+sendUnavailable conn logger r u =
+    sendMsg conn logger "unavailable"
                 [ ("room", J.showJSON r)
                 , ("name", J.showJSON u)
                 ]
 
-sendDisconnected :: WS.Connection -> User -> IO ()
-sendDisconnected conn recipient =
-    sendMsg conn "disconnected"
+sendDisconnected :: WS.Connection -> (String -> IO ()) -> User -> IO ()
+sendDisconnected conn logger recipient =
+    sendMsg conn logger "disconnected"
                 [("recipient", J.showJSON recipient)]
 
-sendError :: WS.Connection -> String -> String -> IO ()
-sendError conn s m =
-    sendMsg conn "error"
+sendError :: WS.Connection -> (String -> IO ()) -> String -> String -> IO ()
+sendError conn logger s m =
+    sendMsg conn logger "error"
                  [ ("error", J.showJSON s)
                  , ("message", J.showJSON m)
                  ]
 
-sendKeepalive :: WS.Connection -> IO ()
-sendKeepalive conn =
-    sendMsg conn "keepalive" []
+sendKeepalive :: WS.Connection -> (String -> IO ()) -> IO ()
+sendKeepalive conn logger =
+    sendMsg conn logger "keepalive" []
 
 
 catchConnEx :: IO a -> (WS.ConnectionException -> IO a) -> IO a
@@ -160,16 +185,26 @@ catchConnEx = C.catch
 dieOnConnEx :: IO () -> IO ()
 dieOnConnEx = flip catchConnEx $ const $ return ()
 
-server :: MVar ServerState -> WS.ServerApp
-server mstate pending = dieOnConnEx $ do
+server :: MVar ServerState -> MVar LogLevel -> WS.ServerApp
+server mstate mlevel pending = dieOnConnEx $ do
   conn <- WS.acceptRequest pending
   chan <- atomically $ newTChan
   roomRef <- newIORef Nothing
   nameRef <- newIORef Nothing
-  forkIO $ forever $ sendFromChan conn chan
+  let logger lvl s = do
+        r <- readIORef roomRef
+        n <- readIORef nameRef
+        logEntry mlevel lvl r n s
+      sendLogger = (logger Message) . ("we sent " ++)
+      sendErrLogger = (logger Error) . ("(sent to client) " ++)
+  logger Event "connected"
+  forkIO $ forever $ do
+    s <- atomically $ readTChan chan
+    r <- readIORef roomRef
+    n <- readIORef nameRef
+    send conn sendLogger s
   flip C.finally (disconnect conn roomRef nameRef) $ forever $ do
     text <- WS.receiveData conn
-    putStrLn (T.unpack text)
     let jsonString = T.unpack text
         y = do
           jsonData <- case J.decode jsonString of
@@ -184,8 +219,10 @@ server mstate pending = dieOnConnEx $ do
               pubkey <- Map.lookup "pubkey" jsonData
               Just $ do
                 n <- readIORef nameRef
+                logger Message $ "sent us " ++ jsonString
+                logger Event $ "attempted to join room " ++ room ++ " with name " ++ name
                 if isJust n
-                then sendError conn "already joined" jsonString
+                then sendError conn sendErrLogger "already joined" jsonString
                 else
                     if usernameOK name && roomOK room
                     then do
@@ -193,37 +230,45 @@ server mstate pending = dieOnConnEx $ do
                          (\success ->
                               if success
                               then do
-                                writeIORef roomRef $ Just room
-                                writeIORef nameRef $ Just name
-                                sendWelcome conn room name
-                              else sendUnavailable conn room name
+                                atomicWriteIORef roomRef $ Just room
+                                atomicWriteIORef nameRef $ Just name
+                                logger Event "signed in"
+                                sendWelcome conn sendLogger room name
+                              else do
+                                logger Event "requested name unavailable"
+                                sendUnavailable conn sendLogger room name
                          )
-                    else sendError conn "invalid username or room" jsonString
-          else if t == "keepalive" then Just $ sendKeepalive conn
+                    else sendError conn sendErrLogger "invalid username or room" jsonString
+          else if t == "keepalive" then Just $
+               do
+                 logger All $ "sent us " ++ jsonString
+                 sendKeepalive conn $ (logger All) . ("we sent " ++)
           else if t == "client" then
             do
               sender <- Map.lookup "sender" jsonData
               recipient <- Map.lookup "recipient" jsonData
               Just $ do
+                logger Message $ "sent us " ++ jsonString
                 room <- readIORef roomRef
                 name <- readIORef nameRef
                 case (room, name) of
                   (Just r, Just n) ->
                       if n /= sender
-                      then sendError conn "incorrect sender" jsonString
+                      then sendError conn sendErrLogger "incorrect sender" jsonString
                       else do
                         s <- readMVar mstate
                         merr <- forwardMessage s r recipient jsonString
                         case merr of
-                          Nothing -> return ()
-                          Just Nonexistent -> sendError conn "no such recipient" jsonString
-                          Just Disconnected -> sendDisconnected conn recipient
-                  _ -> sendError conn "not joined yet" jsonString
+                          Nothing -> logger Event $ sender ++ " sent message to " ++ recipient
+                          Just Nonexistent -> sendError conn sendErrLogger "no such recipient" jsonString
+                          Just Disconnected ->
+                              do
+                                logger Event $ sender ++ " failed to send message to disconnected user " ++ recipient
+                                sendDisconnected conn sendLogger recipient
+                  _ -> sendError conn sendErrLogger "not joined yet" jsonString
           else Nothing
     case y of
-      Nothing -> do
-                   putStrLn $ "bad message: " ++ jsonString
-                   sendError conn "bad message" jsonString
+      Nothing -> sendError conn sendErrLogger "bad message" jsonString
       Just x -> x
   where
     disconnect conn roomRef nameRef = do
@@ -234,6 +279,7 @@ server mstate pending = dieOnConnEx $ do
       case (room, name) of
         (Just r, Just n) -> alterRoom mstate r (markUserDisconnected n) (const $ return ())
         _ -> return ()
+      logEntry mlevel Event room name "disconnected"
 
 usernameOK :: String -> Bool
 usernameOK = alnum 8
@@ -249,8 +295,60 @@ alnum n s =
              'A' <= c && c <= 'Z' ||
              '0' <= c && c <= '9') s
 
+tryRead :: (Read a) => String -> Maybe a
+tryRead = fmap fst . listToMaybe . reads
+
+console :: MVar ServerState -> MVar LogLevel -> IO ()
+console mstate mlevel =
+    forever $ do
+      inp <- getLine
+      let inpWords = words inp
+      case inpWords of
+        ("help":_) ->
+            putStrLn "Valid commands:\n  log (None|Error|Event|Message|All)\n  list [(_room_|*) [full]]"
+        ("log":l:[]) ->
+            case tryRead l of
+              Just level ->
+                  do
+                    swapMVar mlevel level
+                    putStrLn $ "log level set to " ++ l
+              _ -> putStrLn $ "unknown log level: " ++ l
+        ("list":args) ->
+            do
+              s <- readMVar mstate
+              putStrLn "Rooms:"
+              case args of
+                [] -> mapM_ (putStrLn . ("  " ++)) (Map.keys s)
+                (room:full) ->
+                        let rooms = if room == "*"
+                                    then Map.keys s
+                                    else [room]
+                            showUser u (mc, k) =
+                                "    " ++
+                                (if isJust mc
+                                 then ""
+                                 else "(x) ") ++
+                                u ++
+                                (if full == ["full"]
+                                 then (" [" ++ k ++ "]")
+                                 else "")
+                        in mapM_ (\r ->
+                                  case Map.lookup r s of
+                                    Nothing -> putStrLn $ " " ++ r ++ ": empty"
+                                    Just us -> do
+                                      putStrLn $ "  " ++ r ++ ":"
+                                      Map.foldrWithKey
+                                             (\u ud m ->
+                                                  m >> (putStrLn $ showUser u ud))
+                                             (return ()) us
+                                 ) rooms
+        _ -> putStrLn $ "invalid command: " ++ inp
+
 main :: IO ()
 main = do
   mstate <- newMVar newServerState
+  mlevel <- newMVar Message
+  hSetBuffering stdout LineBuffering
   putStrLn $ "Starting server on port " ++ show port ++ "..."
-  WS.runServer "127.0.0.1" port $ server mstate
+  forkIO $ console mstate mlevel
+  WS.runServer "127.0.0.1" port $ server mstate mlevel
