@@ -68,7 +68,12 @@ may be present depending on the type of the message.
 ### join
 
 A "join" message is sent by the client when they sign in to the
-server. Its fields are:
+server. The sign-in may be unsuccessful if the name they requested is
+unavailable; however, after a "join" message has been sent, another
+"join" message must not be sent until an "unavailable" message has
+been received in reply.
+
+Fields:
 
 * room: the room the user wishes to join. This must be a string 1-20
   characters long, containing only alphanumeric characters.
