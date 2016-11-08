@@ -153,8 +153,15 @@ sendKeepalive :: WS.Connection -> IO ()
 sendKeepalive conn =
     sendMsg conn "keepalive" []
 
+
+catchConnEx :: IO a -> (WS.ConnectionException -> IO a) -> IO a
+catchConnEx = C.catch
+
+dieOnConnEx :: IO () -> IO ()
+dieOnConnEx = flip catchConnEx $ const $ return ()
+
 server :: MVar ServerState -> WS.ServerApp
-server mstate pending = do
+server mstate pending = dieOnConnEx $ do
   conn <- WS.acceptRequest pending
   chan <- atomically $ newTChan
   roomRef <- newIORef Nothing
