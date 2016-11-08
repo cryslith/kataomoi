@@ -94,6 +94,7 @@ function receiveServer(data) {
         show("users");
         break;
     case "unavailable":
+        enable("button_signin");
         if (!("room" in data && "name" in data)) {
             serverError("Message missing fields");
             return;
@@ -202,6 +203,7 @@ function signIn() {
 
     if (ok) {
         hide("errorAlert");
+        disable("button_signin");
         join();
     } else {
         showAlert(errmsg);
