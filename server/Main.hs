@@ -1,11 +1,14 @@
 import qualified Network.WebSockets as WS
+import qualified Network.WebSockets.Stream as Stream
+import qualified Network.Socket as S
 import qualified Text.JSON as J
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import qualified Control.Exception as C
 import qualified Data.Foldable as F (mapM_)
+import Network.WebSockets.Connection (ConnectionOptions, defaultConnectionOptions, pendingStream)
 import Control.Monad (forever, when, void)
-import Control.Concurrent (MVar, newMVar, modifyMVarMasked_, readMVar, swapMVar, forkIO)
+import Control.Concurrent (MVar, newMVar, modifyMVarMasked_, readMVar, swapMVar, forkIO, forkIOWithUnmask)
 import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TChan (TChan, newTChan, readTChan, writeTChan)
 import Data.IORef
@@ -186,7 +189,7 @@ dieOnConnEx :: IO () -> IO ()
 dieOnConnEx = flip catchConnEx $ const $ return ()
 
 server :: MVar ServerState -> MVar LogLevel -> WS.ServerApp
-server mstate mlevel pending = dieOnConnEx $ do
+server mstate mlevel pending = do
   conn <- WS.acceptRequest pending
   chan <- atomically $ newTChan
   roomRef <- newIORef Nothing
@@ -198,7 +201,7 @@ server mstate mlevel pending = dieOnConnEx $ do
       sendLogger = (logger Message) . ("we sent " ++)
       sendErrLogger = (logger Error) . ("(sent to client) " ++)
   logger Event "connected"
-  forkIO $ forever $ do
+  forkIO $ dieOnConnEx $ forever $ do
     s <- atomically $ readTChan chan
     r <- readIORef roomRef
     n <- readIORef nameRef
@@ -344,6 +347,28 @@ console mstate mlevel =
                                  ) rooms
         _ -> putStrLn $ "invalid command: " ++ inp
 
+
+runLenientServer :: String -> Int -> WS.ServerApp -> IO ()
+runLenientServer host port app = S.withSocketsDo $
+  C.bracket
+  (WS.makeListenSocket host port)
+  S.close
+  (\sock ->
+    C.mask_ $ forever $ do
+      C.allowInterrupt
+      (conn, _) <- S.accept sock
+      void $ forkIOWithUnmask $ \unmask ->
+        dieOnConnEx $ C.finally (unmask $ runApp conn defaultConnectionOptions app) (S.close conn)
+    )
+
+runApp :: S.Socket -> ConnectionOptions -> WS.ServerApp -> IO ()
+runApp socket opts app =
+    C.bracket
+        (WS.makePendingConnection socket opts)
+        (Stream.close . pendingStream)
+        app
+
+
 main :: IO ()
 main = do
   mstate <- newMVar newServerState
@@ -351,4 +376,4 @@ main = do
   hSetBuffering stdout LineBuffering
   putStrLn $ "Starting server on port " ++ show port ++ "..."
   forkIO $ console mstate mlevel
-  WS.runServer "127.0.0.1" port $ server mstate mlevel
+  runLenientServer "127.0.0.1" port $ server mstate mlevel
