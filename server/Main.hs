@@ -13,7 +13,6 @@ import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TChan (TChan, newTChan, readTChan, writeTChan)
 import Data.IORef
 import Data.Maybe (isJust, fromMaybe, listToMaybe)
-import Control.Lens.At (at)
 import Data.Time.LocalTime (getZonedTime)
 import Data.Time.Format (formatTime, defaultTimeLocale)
 import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
@@ -74,6 +73,15 @@ usersJSON =
                         , J.showJSON $ isJust mchan)
                       ]
             )
+
+at :: (Functor f, Ord k) => k -> (Maybe a -> f (Maybe a)) -> Map.Map k a -> f (Map.Map k a)
+at k f m = let mv = Map.lookup k m
+               fmv' = f mv
+           in fmap (\mv' -> case mv' of
+                              Just v' -> Map.insert k v' m
+                              Nothing -> Map.delete k m
+                   )
+                   fmv'
 
 alterRoom :: MVar ServerState -> Room -> RoomAlterer -> (Bool -> IO ()) -> IO ()
 alterRoom mstate room f react =
