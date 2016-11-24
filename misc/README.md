@@ -3,7 +3,7 @@
 ## kataomoi.asy
 
 `kataomoi.asy` is the Asymptote source code for kataomoi's favicons.
-If you have Asymptote and icoutils installed, you can generate new
-icons by running
+If you have Asymptote, ImageMagick, and icoutils installed, you can
+generate new icons by running
 
     $ make
