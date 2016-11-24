@@ -38,6 +38,7 @@ window.onload = function() {
     socket.onclose = socketClosed;
     keepalive_intervalID = setInterval(sendKeepalive, 10000);
     document.forms["signin"]["room"].value = location.hash.substring(1);
+    show("keygen");
     rsa.generateKeyPair({bits: TUNNEL_BITS, e: PUBLIC_EXPONENT, workers: -1},
                         function(e, kp) {
                             hide("keygen");
