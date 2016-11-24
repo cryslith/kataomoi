@@ -32,7 +32,7 @@ var keepalive_intervalID = undefined;
 
 window.onload = function() {
     enable("button_signin");
-    enable("button_selections");
+    disable("button_selections");
     socket = new WebSocket("wss://kataomoi.mit.edu/ws/");
     socket.onmessage = receiveServer_raw;
     socket.onclose = socketClosed;
@@ -254,6 +254,7 @@ function updateUsers(users, newUsernames) {
                 }
             } else {
                 newUser(username, userPubkey, newUsernames[username]["connected"]);
+                enable("button_selections");
             }
         }
         else {
@@ -302,6 +303,7 @@ function newUser(username, pubkey, isConnected) {
 }
 
 function sendSelections() {
+    disable("button_selections");
     [...users].forEach(function(value) {
         var username = value[0];
         var data = value[1];
