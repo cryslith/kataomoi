@@ -51,7 +51,7 @@ First, we install NGINX, Haskell tools, and Let's Encrypt tools:
 Next, all of the cabal packages we'll need for the server:
 
     $ cabal update
-    $ cabal install json lens text websockets
+    $ cabal install text json containers websockets stm time network
 
 Now, clone this repo, and tweak the client JS to connect to your
 server:
