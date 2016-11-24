@@ -2,8 +2,8 @@
 
 ## kataomoi.asy
 
-`kataomoi.asy` is the Asymptote source code for
-`../client/kataomoi.png`. If you have Asymptote installed, you can
-generate a new `kataomoi.png` by running
+`kataomoi.asy` is the Asymptote source code for kataomoi's favicons.
+If you have Asymptote and icoutils installed, you can generate new
+icons by running
 
-    asy -f png kataomoi.asy
+    $ make

@@ -16,7 +16,6 @@ real keyholeY = 2/3*heartTopHalf;
 
 path keyhole = arc((0,keyholeY+keyholeWidth/2), (keyholeWidth/4, keyholeY), (-keyholeWidth/4, keyholeY))--(-keyholeWidth/2,keyholeY-keyholeWidth)--(keyholeWidth/2,keyholeY-keyholeWidth)--cycle;
 
-fill(heart^^keyhole, evenodd+fillColor);
 
 real lockOuter = (heartWidth + lockWidth)/2;
 real lockInner = (heartWidth - lockWidth)/2;
@@ -27,4 +26,7 @@ real lockInnerTop = lockTop - lockWidth/2;
 
 path lock = ((lockOuter,heartHeight-0.1inch){up}::(lockOuter,lockTopHalf){up}::(0,lockOuterTop){left}::(-lockOuter,lockTopHalf){down}::{down}(-lockOuter,heartHeight-0.1inch)--(-lockInner,heartHeight-0.1inch){up}::(-lockInner,lockTopHalf){up}::(0,lockInnerTop){right}::(lockInner,lockTopHalf){down}::{down}(lockInner,heartHeight-0.1inch)--cycle);
 
+fill((-lockOuterTop/2,0)--(lockOuterTop/2,0)--(lockOuterTop/2,lockOuterTop)--(-lockOuterTop/2,lockOuterTop)--cycle, opacity(0));
+
+fill(heart^^keyhole, evenodd+fillColor);
 fill(lock, fillColor);
