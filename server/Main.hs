@@ -293,18 +293,20 @@ server mstate mlevel pending = do
       logEntry mlevel Event room name "disconnected"
 
 usernameOK :: String -> Bool
-usernameOK = alnum 8
+usernameOK = okChars 32
 
 roomOK :: String -> Bool
-roomOK = alnum 20
+roomOK = okChars 32
 
-alnum :: Int -> String -> Bool
-alnum n s =
+okChars :: Int -> String -> Bool
+okChars n s =
   length s >= 1 &&
   length s <= n &&
   all (\c -> 'a' <= c && c <= 'z' ||
              'A' <= c && c <= 'Z' ||
-             '0' <= c && c <= '9') s
+             '0' <= c && c <= '9' ||
+             c == '.' || c == '-' || c == '_'
+      ) s
 
 tryRead :: (Read a) => String -> Maybe a
 tryRead = fmap fst . listToMaybe . reads

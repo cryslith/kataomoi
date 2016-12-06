@@ -75,10 +75,12 @@ been received in reply.
 
 Fields:
 
-* room: the room the user wishes to join. This must be a string 1-20
-  characters long, containing only alphanumeric characters.
+* room: the room the user wishes to join. This must be a string 1-32
+  characters long, containing only alphanumeric characters, periods,
+  hyphens, and underscores.
 * name: the name the user wishes to be known by. This must be a string
-  1-8 characters long, containing only alphanumeric characters.
+  1-32 characters long, containing only alphanumeric characters,
+  periods, hyphens, and underscores.
 * pubkey: an RSA modulus, encoded as a string of base 64 digits. This
   will be the user's public key for wrapping all client-to-client
   messages.

@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name: kataomoi-server
-version: 1.0.0.0
+version: 1.0.0.1
 synopsis: Cryptographic dating webapp
 -- description:
 license: MIT
