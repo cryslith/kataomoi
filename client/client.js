@@ -194,11 +194,11 @@ function signIn() {
     room = document.forms["signin"]["room"].value;
     requestedName = document.forms["signin"]["name"].value;
     if (!roomOK(room)) {
-        errmsg += "Room must be 1-20 alphanumeric characters (no spaces). ";
+        errmsg += "Room must be 1-32 alphanumeric characters, periods, hyphens, or underscores (no spaces). ";
         ok = false;
     }
     if (!usernameOK(requestedName)) {
-        errmsg += "Name must be 1-8 alphanumeric characters (no spaces). ";
+        errmsg += "Name must be 1-32 alphanumeric characters, periods, hyphens, or underscores (no spaces). ";
         ok = false;
     }
 
@@ -217,11 +217,11 @@ function join() {
 }
 
 function usernameOK(username) {
-    return /^[a-zA-Z0-9]{1,8}$/.test(username);
+    return /^[a-zA-Z0-9._-]{1,32}$/.test(username);
 }
 
 function roomOK(roomname) {
-    return /^[a-zA-Z0-9]{1,20}$/.test(roomname);
+    return /^[a-zA-Z0-9._-]{1,32}$/.test(roomname);
 }
 
 function updateUsers(users, newUsernames) {
